@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build
+        run: python3 build.py
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check dist/app.js
+          if [ -f dist/pwa.js ]; then node --check dist/pwa.js; fi
+          if [ -f dist/sw.js ]; then node --check dist/sw.js; fi
+
+      - name: Install Playwright
+        run: |
+          pip install playwright==1.*
+          python -m playwright install --with-deps chromium
+
+      - name: Smoke test (lessons, Stockfish, offline)
+        run: |
+          (cd dist && python3 -m http.server 8765 >/dev/null 2>&1 &)
+          sleep 2
+          python3 tests/smoke.py
