@@ -25,7 +25,7 @@ cd dist && python3 -m http.server 8765
 
 `dist/` is a plain static site, so any static host works.
 
-> **Storage:** the app currently saves progress through the claude.ai artifact runtime (`window.claude.use('db')`). Outside claude.ai it falls back to the browser's `localStorage` and shows a "preview mode" banner. An offline, installable version with on-device storage is planned.
+> **Storage:** installed or opened from any normal web address, the app keeps all progress on the device (browser storage, marked persistent) — back it up with **Log → Backup**. Inside a claude.ai artifact it uses the artifact's database (`window.claude.use('db')`) instead. Deployment with a family-only login is described in [DEPLOY.md](DEPLOY.md).
 
 ## Install / offline
 
