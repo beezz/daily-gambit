@@ -1,0 +1,19 @@
+# build output
+dist/
+
+# local data, exports and secrets — never commit these
+*.env
+.env*
+*.key
+*.pem
+secrets/
+backups/
+exports/
+*-progress*.json
+
+# tooling
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+*.png
