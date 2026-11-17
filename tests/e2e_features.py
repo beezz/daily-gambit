@@ -54,8 +54,7 @@ async def main():
         txt=await pg.inner_text('#lesson'); print('after 2nd finish:', txt[:60].replace('\n',' '))
         if await pg.query_selector('[data-l="skipretry"]'): await pg.click('[data-l="skipretry"]'); await pg.wait_for_timeout(300)
         print('done keep btn:', bool(await pg.query_selector('[data-l="keep"]')))
-        await pg.click('[data-l="log"]'); await pg.wait_for_timeout(500)
-        await pg.click('#go'); await pg.wait_for_timeout(600)
+        await pg.click('[data-l="log"]'); await pg.wait_for_timeout(900)
         print('overlay after partial mon:', bool(await pg.query_selector('.overlay')))
         # ---- Tuesday manual full session -> reward
         await pg.click('[data-act="slot"][data-k="tue"]'); await pg.wait_for_timeout(200)

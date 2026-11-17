@@ -1,7 +1,7 @@
 /* Daily Gambit — lessons */
 
 var L=null;                                  // the active lesson
-var PEND=lsGet('ctq2_pend')||{};             // lesson results waiting to be logged, by slot
+var PEND=lsGet(K('pend'))||{};             // lesson results waiting to be logged, by slot
 function setPend(slot,o){
   var cur=PEND[slot]||{};
   var parts=(cur.parts||[]).slice();
@@ -10,9 +10,9 @@ function setPend(slot,o){
   PEND[slot]=Object.assign({},cur,o,{parts:parts,extra:extra,lesson:true,at:Date.now()});
   if(cur.min && o.min && o.addMin) PEND[slot].min=cur.min+o.min;
   delete PEND[slot].addMin;
-  lsSet('ctq2_pend',PEND);
+  lsSet(K('pend'),PEND);
 }
-function clearPend(slot){ delete PEND[slot]; lsSet('ctq2_pend',PEND); }
+function clearPend(slot){ delete PEND[slot]; lsSet(K('pend'),PEND); }
 function setL(x){ L=x; }
 function freeBoards(all){ Object.keys(BOARDS).forEach(function(k){ var b=BOARDS[k]; if(!b.cg) return; if(all){ try{ b.cg.destroy(); }catch(e){} delete BOARDS[k]; } else b.cg.setAutoShapes([]); }); }
 function switchLesson(slot,kind){ freeBoards(true); if(L&&L.clock) L.clock.halt(); var x={coord:CoordLesson,wood:WoodLesson}[kind](slot); L=newLessonObj(x,kind); render(); driveClock(); }
@@ -26,7 +26,7 @@ function openLesson(slot,kind){
   loadData().then(function(){ L=newLessonObj(make(slot),kind||SL[slot].lesson); if(location.hash==='#lesson') render(); else location.hash='lesson'; driveClock(); })
     .catch(function(){ toast(t('Could not load the lesson files. Check your connection.')); location.hash='today'; render(); });
 }
-function finishLesson(slot,o){ freeBoards(true); if(L&&L.clock) L.clock.halt(); setPend(slot,o); draft.slot=slot; L=null; location.hash='today'; toast(t('Lesson done! Check the form and tap Complete.')); }
+function finishLesson(slot,o){ freeBoards(true); if(L&&L.clock) L.clock.halt(); setPend(slot,o); draft.slot=slot; L=null; location.hash='today'; autoLog(slot); }
 function engineError(fen){
   return '<div class="msg no">'+t('Stockfish couldn’t start on this device.')+' '+(fen?'<a href="https://lichess.org/analysis/standard/'+encodeURI(fen.replace(/ /g,'_'))+'" target="_blank" rel="noopener">'+t('Open this position on Lichess')+'</a>':'')+'</div>';
 }
@@ -584,9 +584,9 @@ var LEVELS=[{skill:0,mt:80,d:1},{skill:2,mt:120,d:2},{skill:4,mt:200,d:3},{skill
 var EVALS=[['+-','White winning'],['±','White better'],['=','Equal'],['∓','Black better'],['-+','Black winning'],['∞','Unclear']];
 function WeekendLesson(slot){
   var L={slot:slot,title:t('Classical Game & Notebook')};
-  var saved=lsGet('ctq2_wk');
+  var saved=lsGet(K('wk'));
   var st={view:'menu',cfg:{color:'w',tc:'15+10',level:4,soh:true},G:null,b:null,nbc:new Clock()};
-  function persist(){ if(st.G) lsSet('ctq2_wk',st.G); }
+  function persist(){ if(st.G) lsSet(K('wk'),st.G); }
   function gameFrom(G){ var g=new Chess(); G.moves.forEach(function(s){ tryMove(g,s); }); return g; }
   function startPlay(){
     var c=st.cfg, kid=c.color==='r'?(Math.random()<.5?'w':'b'):c.color, base=(c.tc==='25+10'?25:15)*60000;
@@ -746,7 +746,7 @@ function WeekendLesson(slot){
     if(a==='cfg'){ st.cfg[el.getAttribute('data-k')]=v; lr(); }
     else if(a==='play') startPlay();
     else if(a==='resume'){ st.G=saved; if(st.G.result){ st.view='nb'; if(!st.G.nbStart) st.G.nbStart=Date.now(); } else { st.view='play'; st.lastTs=Date.now(); maybeEngine(); } lr(); }
-    else if(a==='discard'){ lsSet('ctq2_wk',null); saved=null; lr(); }
+    else if(a==='discard'){ lsSet(K('wk'),null); saved=null; lr(); }
     else if(a==='enter'){ st.entry={g:new Chess(),kid:'w',res:'1-0',tc:'15+10',last:null}; st.view='enter'; lr(); }
     else if(a==='loadpgn'){ var txt=$('#pgnin').value; var g=new Chess(); try{ g.loadPgn(txt); st.entry.g=g; var hd=(g.getHeaders?g.getHeaders():g.header())||{}; if(hd.Result&&hd.Result!=='*') st.entry.res=hd.Result; lr(); toast(t('Game loaded: {n} half-moves',{n:g.history().length})); }catch(e){ toast(t('That PGN could not be read')); } }
     else if(a==='undo'){ st.entry.g.undo(); st.entry.last=null; lr(); }
@@ -767,7 +767,7 @@ function WeekendLesson(slot){
       var tags=Object.keys(G.notes).filter(function(k){return G.notes[k].tag}).length, nd=notesDone();
       var nb={date:G.date,source:G.source,kid:G.kid,tc:G.tc,result:res,moves:G.moves,notes:G.notes,level:G.level||null,review:G.review&&G.review.done?{evals:G.review.evals,mistakes:mistakes()}:null};
       Store.saveNotebook(G.id,nb);
-      G.finished=true; lsSet('ctq2_wk',null);
+      G.finished=true; lsSet(K('wk'),null);
       finishLesson('wk',{min:L.clock.min(),tc:G.tc==='Other'?'Other':G.tc,res:kidRes,bl:tags,engine:G.unlocked&&nd>=3,
         parts:[G.moves.length>=20,G.source==='app'&&G.soh,nd>=3],extra:{nb:G.id},note:(G.source==='app'?'Stockfish L'+G.level:t('Entered game'))+' · '+res+' · '+t('{n} notebook moments',{n:nd})});
     }

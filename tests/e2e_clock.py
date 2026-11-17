@@ -44,9 +44,16 @@ async def main():
         await pg.click('[data-act="unpause"]'); await pg.wait_for_timeout(1500)
         d=await secs(pg); check(d>c+1.0 and await pg.is_visible('#lesson cg-board'), 'resumed: clock runs and board back (%.1fs)'%d)
         await pg.click('[data-act="end"]'); await pg.wait_for_timeout(600)
-        pend=await pg.evaluate("JSON.parse(localStorage.getItem('ctq2_pend')||'{}')")
-        check('tue' in pend and pend['tue']['min']==1, 'end: session pending with active minutes %s'%pend.get('tue',{}).get('min'))
+        ss=await pg.evaluate("JSON.parse(localStorage.getItem('ctq2_state')).sessions")
+        check(len(ss)==1 and ss[0]['slot']=='tue' and ss[0]['min']==1 and ss[0]['lesson'], 'end: session logged right away with active minutes (%s)'%[(x['slot'],x['min']) for x in ss])
+        check(await pg.evaluate("JSON.parse(localStorage.getItem('ctq2_pend')||'{}').tue")==None, 'end: nothing left pending, no form prefill')
         check('#today' in pg.url, 'end: back on today')
+        # a second in-app Tuesday lesson today merges into the same log entry
+        await open_slot(pg,'tue'); await pg.wait_for_timeout(800)
+        await pg.click('[data-l="pick"][data-v="ks"]'); await pg.wait_for_timeout(1500)
+        await pg.click('[data-act="end"]'); await pg.wait_for_timeout(600)
+        ss=await pg.evaluate("JSON.parse(localStorage.getItem('ctq2_state')).sessions")
+        check(len(ss)==1 and ss[0]['min']==2, 'second lesson same day merged (%s)'%[(x['slot'],x['min']) for x in ss])
 
         # Coordinates: intro idle, quiz counts
         await open_slot(pg,'thu'); await pg.click('[data-l="coord"], [data-act="coord"]') if await pg.query_selector('[data-l="coord"], [data-act="coord"]') else None; await pg.wait_for_timeout(1500)
@@ -61,7 +68,7 @@ async def main():
         # Leaving the lesson halts the clock
         await pg.click('[data-act="leave"]'); await pg.wait_for_timeout(300)
         g=await secs(pg); await pg.wait_for_timeout(1200); h=await secs(pg)
-        check(abs(h-g)<0.1, 'outside lesson: clock frozen')
+        check(abs(h-g)<0.1, 'outside lesson: clock frozen (%.2f -> %.2f, %s)'%(g,h,pg.url))
 
         # Woodpecker: intro idle, solving counts
         await open_slot(pg,'mon'); await pg.wait_for_timeout(1500)
