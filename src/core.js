@@ -151,7 +151,9 @@ var Store = {
   mode:'connecting', db:null, chain:Promise.resolve(), loaded:false, slowTimer:null, slow:false,
   init:function(){
     var self=this, p=null;
-    try{ if(window.claude && typeof window.claude.use==='function') p=window.claude.use('db'); }catch(e){}
+    var hosted=false;
+    try{ if(window.claude && typeof window.claude.use==='function'){ hosted=true; p=window.claude.use('db'); } }catch(e){}
+    if(!hosted){ self.mode='device'; self.loadLocal(); self.persist(); render(); return; }   // installed / offline app: everything lives on this device
     Promise.resolve(p).then(function(db){
       if(!db){ self.mode='local'; self.loadLocal(); render(); return; }
       self.db=db; self.mode='live'; self.slowTimer=setTimeout(function(){self.slow=true; if(!inLesson()) render();},10000);
@@ -168,23 +170,52 @@ var Store = {
       }, function(e){ self.fail(e); });
     }).catch(function(){ self.mode='local'; self.loadLocal(); render(); });
   },
+  isLocal:function(){ return this.mode==='local'||this.mode==='device'; },
+  persist:function(){ try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(function(){}); }catch(e){} },
+  allNotebooks:function(){
+    if(this.mode==='live') return this.db.collection('notebooks').get().then(function(qs){ var o={}; qs.docs.forEach(function(d){ o[d.id]=clone(d.data()); }); return o; });
+    var o={}; try{ Object.keys(localStorage).forEach(function(k){ if(k.indexOf('ctq2_nb_')===0) o[k.slice(8)]=lsGet(k); }); }catch(e){}
+    return Promise.resolve(o);
+  },
+  exportData:function(){
+    return this.allNotebooks().then(function(nbs){
+      return {app:'daily-gambit',format:1,exportedAt:new Date().toISOString(),state:clone(S),rewards:clone(REWARDS),notebooks:nbs};
+    });
+  },
+  /* replaces everything with the backup's content */
+  importAll:function(data){
+    var self=this, st=Object.assign(clone(DEFAULT_STATE),clone(data.state||{})), rw=clone(data.rewards||[]), nbs=clone(data.notebooks||{});
+    st.sessions=(st.sessions||[]).filter(function(x){return x&&x.id&&x.slot&&x.date});
+    return this.resetAll().then(function(){
+      S=st; REWARDS=rw; setLang(S.lang);
+      if(self.isLocal()){ self.saveLocal(); Object.keys(nbs).forEach(function(id){ lsSet('ctq2_nb_'+id,nbs[id]); }); return; }
+      if(self.mode!=='live') return;
+      var db=self.db, body=self.settingsBody();
+      return self.q(function(){
+        return db.doc('progress/settings').set(body)
+          .then(function(){ return Promise.all(S.sessions.map(function(x){ return db.collection('sessions').doc(x.id).set(clone(x)); })); })
+          .then(function(){ return Promise.all(REWARDS.map(function(x){ return db.collection('rewards').doc(x.id).set(clone(x)); })); })
+          .then(function(){ return Promise.all(Object.keys(nbs).map(function(id){ return db.collection('notebooks').doc(id).set(nbs[id]); })); });
+      });
+    });
+  },
   fail:function(e){ clearTimeout(this.slowTimer); if(e && (e.code==='revoked'||e.code==='not_granted')) this.mode='readonly'; else this.slow=true; if(!inLesson()) render(); },
   loadLocal:function(){ var ls=lsGet('ctq2_state'); if(ls){ S=Object.assign(clone(DEFAULT_STATE),ls); setLang(S.lang); } REWARDS=lsGet('ctq2_rewards')||[]; this.loaded=true; },
   saveLocal:function(){ lsSet('ctq2_state',S); lsSet('ctq2_rewards',REWARDS); },
   settingsBody:function(){ var o=clone(S); delete o.sessions; return o; },
   q:function(fn){ var self=this; var p=this.chain.then(fn).catch(function(e){ self.err(e); }); this.chain=p; return p; },
   err:function(e){ var code=e&&e.code; if(code==='invalid_argument'||code==='not_granted'||code==='revoked'){ this.mode='readonly'; render(); toast(t('View only — this account can’t save here')); } else if(code==='quota_exceeded'){ toast(t('Storage is full — delete old sessions')); } else toast(t('Could not save — check your connection')); },
-  saveSettings:function(){ if(this.mode==='local'){this.saveLocal();return Promise.resolve();} if(this.mode!=='live') return Promise.resolve(); var self=this, body=this.settingsBody(); return this.q(function(){ return self.db.doc('progress/settings').set(body); }); },
-  addSession:function(s){ if(this.mode==='local'){this.saveLocal();return Promise.resolve();} if(this.mode!=='live') return Promise.resolve(); var self=this; return this.q(function(){ return self.db.collection('sessions').doc(s.id).set(clone(s)); }); },
-  delSession:function(id){ if(this.mode==='local'){this.saveLocal();return Promise.resolve();} if(this.mode!=='live') return Promise.resolve(); var self=this; return this.q(function(){ return self.db.collection('sessions').doc(id).delete(); }); },
-  saveNotebook:function(id,nb){ if(this.mode==='local'){ lsSet('ctq2_nb_'+id,nb); return Promise.resolve(); } if(this.mode!=='live') return Promise.resolve(); var self=this; return this.q(function(){ return self.db.collection('notebooks').doc(id).set(clone(nb)); }); },
-  saveReward:function(r){ if(this.mode==='local'){this.saveLocal();return Promise.resolve();} if(this.mode!=='live') return Promise.resolve(); var self=this; return this.q(function(){ return self.db.collection('rewards').doc(r.id).set(clone(r)); }); },
+  saveSettings:function(){ if(this.isLocal()){this.saveLocal();return Promise.resolve();} if(this.mode!=='live') return Promise.resolve(); var self=this, body=this.settingsBody(); return this.q(function(){ return self.db.doc('progress/settings').set(body); }); },
+  addSession:function(s){ if(this.isLocal()){this.saveLocal();return Promise.resolve();} if(this.mode!=='live') return Promise.resolve(); var self=this; return this.q(function(){ return self.db.collection('sessions').doc(s.id).set(clone(s)); }); },
+  delSession:function(id){ if(this.isLocal()){this.saveLocal();return Promise.resolve();} if(this.mode!=='live') return Promise.resolve(); var self=this; return this.q(function(){ return self.db.collection('sessions').doc(id).delete(); }); },
+  saveNotebook:function(id,nb){ if(this.isLocal()){ lsSet('ctq2_nb_'+id,nb); return Promise.resolve(); } if(this.mode!=='live') return Promise.resolve(); var self=this; return this.q(function(){ return self.db.collection('notebooks').doc(id).set(clone(nb)); }); },
+  saveReward:function(r){ if(this.isLocal()){this.saveLocal();return Promise.resolve();} if(this.mode!=='live') return Promise.resolve(); var self=this; return this.q(function(){ return self.db.collection('rewards').doc(r.id).set(clone(r)); }); },
   resetAll:function(){
     var self=this, ids=S.sessions.map(function(x){return x.id}), rids=REWARDS.map(function(x){return x.id}), lang=S.lang;
     S=clone(DEFAULT_STATE); S.lang=lang; REWARDS=[];
     ['ctq2_pend','ctq2_wk','ctq2_state','ctq2_rewards'].forEach(function(k){ lsSet(k,null); });
     try{ Object.keys(localStorage).forEach(function(k){ if(k.indexOf('ctq2_nb_')===0) localStorage.removeItem(k); }); }catch(e){}
-    if(this.mode==='local'){ this.saveLocal(); return Promise.resolve(); }
+    if(this.isLocal()){ this.saveLocal(); return Promise.resolve(); }
     if(this.mode!=='live') return Promise.resolve();
     var db=this.db, body=this.settingsBody();
     return this.q(function(){

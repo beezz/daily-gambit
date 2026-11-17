@@ -4,9 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Daily Gambit</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
+<meta name="theme-color" content="#8b5e3c">
+<link rel="manifest" href="manifest.webmanifest" crossorigin="use-credentials">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="css/chessground.css">
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="fonts/fonts.css">
 <style>
 :root{--ink:#3b2a1d;--hdr:#8b5e3c;--deep:#5c3d24;--paper:#ffffff;--soft:#fbf6ef;--light:#f0d9b5;--dark:#b58863;--green:#5f8a3a;--gold:#b58863;--red:#b5452f;--blue:#8b5e3c;--muted:#8a7360;--card:#fff;--line:#ecdcc6}
 *{box-sizing:border-box}
@@ -239,6 +243,8 @@ label.row{border-radius:16px;border-width:2px}
 .danger{border-color:#f1c9bf;box-shadow:0 4px 0 #f6dcd5}
 .bigin{width:100%;font:inherit;font-size:22px;font-family:Fredoka,Nunito,system-ui,sans-serif;text-align:center;letter-spacing:.08em;border:3px solid var(--line);border-radius:16px;padding:10px;margin:8px 0}
 .overlay .card{animation:pop .3s ease-out both}
+.bigta{width:100%;min-height:120px;font:12px/1.4 ui-monospace,Menlo,monospace;border:2px solid var(--line);border-radius:14px;padding:10px;margin:8px 0;resize:vertical}
+#bkfile{margin:8px 0;max-width:100%}
 .confetti{position:fixed;inset:0;pointer-events:none;z-index:50}
 .tpc{width:26px;height:26px;vertical-align:middle}
 .seg button small{font-weight:600;color:var(--muted);font-size:11px}
@@ -257,5 +263,6 @@ nav a .g{font-size:22px}
 <script src="lib/chess.js"></script>
 <script src="lib/chessground.js"></script>
 <script src="app.js"></script>
+<script src="pwa.js" defer></script>
 </body>
 </html>

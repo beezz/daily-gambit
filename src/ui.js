@@ -21,6 +21,7 @@ function render(){
        '<div class="small">'+(c.next?t('{n} XP to {r}',{n:(c.next.xp-c.xp).toLocaleString(LOCALES[LANG]),r:t(c.next.n)}):t('Top rank reached!'))+'</div></div>'+
        '<div class="hstats"><div class="streak"><b>🔥 '+c.cur+'</b><span>'+t('streak')+'</span></div>'+(owed?'<a class="streak gift" href="#prizes"><b>🎁 '+owed+'</b><span>'+t('prizes')+'</span></a>':'')+'</div></header>';
     if(Store.mode==='local') h+='<div class="banner">'+t('Preview mode: progress is kept only in this browser. Open the published app to save it for good.')+'</div>';
+    if(Store.mode==='device'&&S.sessions.length>=5&&(!S.lastBackup||Date.now()-S.lastBackup>14*86400000)) h+='<a class="banner" style="display:block;color:inherit;text-decoration:none" href="#history">💾 '+t('It’s been a while since the last backup. Save one in the Log tab.')+'</a>';
     if(Store.mode==='readonly') h+='<div class="banner">'+t('View only — you can see progress, but only the owner can log sessions.')+'</div>';
     if(Store.mode==='live'&&Store.slow) h+='<div class="banner">'+t('Can’t reach saved progress yet — what you see may be out of date.')+'</div>';
     h+= tb==='today'?vToday(c): tb==='week'?vWeek(c): tb==='woodpecker'?vWood(c): tb==='prizes'?vPrizes(c): vHistory(c);
@@ -220,6 +221,10 @@ function vHistory(c){
     h+='<div class="card"><h2>🎁 '+t('Prize list (for parents)')+'</h2><p class="sub">'+t('After every fully finished session, your child picks one of these. You mark it as given when you hand it over.')+'</p><div class="list">';
     catalog().forEach(function(r){ h+='<div class="coupon"><div class="ci">'+esc(r.icon)+'</div><div class="cm"><b>'+esc(rewardName(r))+'</b></div>'+(catalog().length>1?'<button class="btn ghost sm" data-act="rmprize" data-id="'+r.id+'">'+t('Remove')+'</button>':'')+'</div>'; });
     h+='</div><form id="addprize" class="addprize"><input name="icon" maxlength="4" value="🎁" aria-label="'+t('Icon')+'"><input name="name" maxlength="40" placeholder="'+t('e.g. Ice cream, 30 min tablet time')+'" required><button class="btn sm" type="submit">'+t('Add')+'</button></form></div>';
+    var lb=S.lastBackup?Math.floor((Date.now()-S.lastBackup)/86400000):null;
+    h+='<div class="card"><h2>💾 '+t('Backup')+'</h2><p class="sub">'+(Store.mode==='device'?t('Progress is saved on this device. Keep a backup file in case the phone is lost or the app is removed.'):t('Save a copy of all progress, or move it to another device or to the offline app.'))+'</p>'+
+      '<p class="note">'+t('Last backup:')+' <b>'+(lb==null?t('never'):lb===0?t('today'):t('{n} days ago',{n:lb}))+'</b></p>'+
+      '<div class="btns"><button class="btn" data-act="export">'+(canDownload()?'⬇️ '+t('Download backup'):'📋 '+t('Copy backup'))+'</button><button class="btn ghost" data-act="import">♻️ '+t('Restore from backup…')+'</button></div></div>';
     h+='<div class="card danger"><h2>🗑 '+t('Delete all data')+'</h2><p class="sub">'+t('Removes all sessions, puzzle progress, prizes, badges progress and game notebooks. This cannot be undone.')+'</p><button class="btn warn" data-act="reset1">'+t('Delete all data…')+'</button></div>';
   }
   return h;
@@ -258,6 +263,32 @@ function showNotebook(id){
       return h;
     });
   }).catch(function(){ closeOverlay(); toast(t('Could not load the notebook')); });
+}
+
+/* ---------- backup ---------- */
+var importText='', importData=null;
+function canDownload(){ return Store.mode==='device'||!window.claude; }
+function backupName(){ return 'daily-gambit-backup-'+today()+'.json'; }
+function doExport(){
+  Store.exportData().then(function(data){
+    var json=JSON.stringify(data);
+    S.lastBackup=Date.now(); Store.saveSettings();
+    if(canDownload()){
+      try{ var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([json],{type:'application/json'})); a.download=backupName(); document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1000); toast('💾 '+t('Backup saved')); render(); return; }catch(e){}
+    }
+    showOverlay(function(){ return '<div class="overlay"><div class="card" style="text-align:left"><h2>📋 '+t('Copy backup')+'</h2><p class="sub">'+t('Copy this text and keep it somewhere safe (e.g. a note or an email to yourself). Paste it into “Restore from backup” to bring everything back.')+'</p><textarea id="bktext" class="bigta" readonly>'+esc(json)+'</textarea><div class="btns"><button class="btn" data-act="copybk">'+t('Copy')+'</button><button class="btn ghost" data-act="closeov">'+t('Close')+'</button></div></div></div>'; });
+  }).catch(function(){ toast(t('Could not create the backup')); });
+}
+function parseBackup(txt){
+  try{ var d=JSON.parse(txt); if(d&&d.app==='daily-gambit'&&d.state&&Array.isArray(d.state.sessions)) return d; }catch(e){}
+  return null;
+}
+function importOverlay(step){
+  return function(){
+    if(step===1) return '<div class="overlay"><div class="card" style="text-align:left"><h2>♻️ '+t('Restore from backup')+'</h2><p class="sub">'+t('Choose a backup file or paste the backup text.')+'</p><input type="file" id="bkfile" accept=".json,application/json"><textarea id="bkpaste" class="bigta" placeholder="'+t('…or paste the backup text here')+'">'+esc(importText)+'</textarea><div class="btns"><button class="btn ghost" data-act="closeov">'+t('Cancel')+'</button><button class="btn" data-act="import2">'+t('Continue')+'</button></div></div></div>';
+    var d=importData, n=d.state.sessions.length, when=(d.exportedAt||'').slice(0,10);
+    return '<div class="overlay"><div class="card"><h2>⚠️ '+t('Replace all data?')+'</h2><p>'+t('Backup from {d} · logged sessions: {n}. Everything currently in the app will be replaced by it.',{d:when?fmtDate(when):'?',n:n})+'</p><div class="btns"><button class="btn ghost" data-act="closeov">'+t('Cancel')+'</button><button class="btn warn" data-act="import3">'+t('Restore')+'</button></div></div></div>';
+  };
 }
 
 /* ---------- confetti ---------- */
@@ -343,6 +374,11 @@ document.addEventListener('click',function(e){
   else if(act==='reset1'){ resetWord=''; showOverlay(resetOverlay(1)); }
   else if(act==='reset2'){ showOverlay(resetOverlay(2)); setTimeout(function(){ var i=document.getElementById('resetword'); if(i) i.focus(); },50); }
   else if(act==='resetgo'){ if(wordOk(resetWord)) doReset(); }
+  else if(act==='export'){ doExport(); }
+  else if(act==='copybk'){ var ta=document.getElementById('bktext'); try{ navigator.clipboard.writeText(ta.value).then(function(){ toast('✓ '+t('Copied')); },function(){ ta.select(); }); }catch(e2){ ta.select(); } }
+  else if(act==='import'){ importText=''; importData=null; showOverlay(importOverlay(1)); }
+  else if(act==='import2'){ var d=parseBackup(importText); if(!d){ toast(t('That is not a Daily Gambit backup')); return; } importData=d; showOverlay(importOverlay(2)); }
+  else if(act==='import3'){ var dd=importData; overlay=null; Store.importAll(dd).then(function(){ PEND={}; lsSet('ctq2_pend',null); L=null; importData=null; importText=''; toast('✓ '+t('Backup restored')); location.hash='today'; render(); }).catch(function(){ toast(t('Could not restore the backup')); render(); }); }
 });
 document.addEventListener('toggle',function(e){ if(e.target.getAttribute&&e.target.getAttribute('data-act')==='openlog'){ draft.open=e.target.open; if(e.target.open) updateLive(); } },true);
 document.addEventListener('submit',function(e){
@@ -361,9 +397,11 @@ document.addEventListener('submit',function(e){
 });
 document.addEventListener('input',function(e){
   if(e.target.closest('#logform')) updateLive();
+  if(e.target.id==='bkpaste'){ importText=e.target.value; }
   if(e.target.id==='resetword'){ resetWord=e.target.value; var b=document.getElementById('resetgo'); if(b) b.disabled=!wordOk(resetWord); }
 });
 document.addEventListener('change',function(e){
+  if(e.target.id==='bkfile'&&e.target.files&&e.target.files[0]){ var fr=new FileReader(); fr.onload=function(){ importText=String(fr.result||''); var ta=document.getElementById('bkpaste'); if(ta) ta.value=importText.length>2000?importText.slice(0,2000)+'…':importText; }; fr.readAsText(e.target.files[0]); return; }
   if(e.target.closest('#logform')) updateLive();
   var l=e.target.getAttribute&&e.target.getAttribute('data-l'); if(l&&L&&L.change&&inLesson()){ L.change(l,e.target); }
 });
