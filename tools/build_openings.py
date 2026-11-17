@@ -9,7 +9,7 @@ side and fails if one loses more than 60 centipawns against the engine's best mo
 import sys, os, json, csv, subprocess, tempfile
 import chess
 sys.path.insert(0, os.path.dirname(__file__))
-from openings_src import REPS, NOTES
+from openings_src import REPS, NOTES, TRAPS
 
 ROOT = os.path.join(os.path.dirname(__file__), '..')
 names_dir = sys.argv[1]
@@ -30,7 +30,16 @@ for f in 'abcde':
 
 out = {'reps': []}
 to_check = []
-for rep in REPS:
+# each trap becomes two one-line repertoires: spring it ("set") and refuse the bait ("avoid")
+ALL = [dict(r, kind='rep') for r in REPS]
+for tr in TRAPS:
+    for kind in ('set', 'avoid'):
+        d = tr[kind]
+        ALL.append({'id': 'trap-%s-%s' % (tr['id'], kind), 'side': d['side'], 'icon': tr['icon'], 'title': tr['name'],
+                    'lines': [d['line']], 'kind': kind, 'trap': tr['id'], 'link': tr['link'], 'story': tr['story'],
+                    'start': d.get('key', 0), 'checkFrom': d['blunder'] + 1 if kind == 'set' else d['key'],
+                    'plyNotes': d.get('notes', {})})
+for rep in ALL:
     nodes = {'': {'fen': chess.STARTING_FEN, 'ch': []}}
     lines = []
     for li, line in enumerate(rep['lines']):
@@ -40,17 +49,18 @@ for rep in REPS:
             norm = b.san(mv)
             if norm != san: raise SystemExit('%s line %d: write %s as %s' % (rep['id'], li, san, norm))
             parent = ' '.join(path)
-            ours = (b.turn == chess.WHITE) == (rep['side'] == 'w')
+            ours = (b.turn == chess.WHITE) == (rep['side'] == 'w') and i >= rep.get('start', 0)
             before = b.fen()
             b.push(mv); path.append(san); key = ' '.join(path)
             if key not in nodes:
                 nodes[key] = {'fen': b.fen(), 'ch': []}
                 nodes[parent]['ch'].append(san)
-                if ours: to_check.append({'rep': rep['id'], 'path': key, 'fen': before, 'uci': mv.uci()})
+                if ours and i >= rep.get('checkFrom', 0): to_check.append({'rep': rep['id'], 'path': key, 'fen': before, 'uci': mv.uci()})
             node = nodes[key]
             node['ours'] = ours
             if epd(b) in NAMES: node['eco'], node['name'] = NAMES[epd(b)]
-            if ours and key in NOTES: node['note'] = NOTES[key]
+            if rep['kind'] == 'rep' and ours and key in NOTES: node['note'] = NOTES[key]
+            if i in rep.get('plyNotes', {}): node['note'] = rep['plyNotes'][i]
         if not nodes[' '.join(path)].get('ours'):
             raise SystemExit('%s line %d must end with our move: %s' % (rep['id'], li, line))
         lines.append(line)
@@ -61,8 +71,10 @@ for rep in REPS:
             if 'name' in par: nodes[key]['eco'], nodes[key]['name'] = par['eco'], par['name']
     # a line that is a prefix of another line is not a separate drill line
     keep = [l for l in lines if not any(o != l and o.startswith(l + ' ') for o in lines)]
-    out['reps'].append({'id': rep['id'], 'side': rep['side'], 'icon': rep['icon'], 'title': rep['title'],
-                        'lines': keep, 'nodes': nodes})
+    o = {'id': rep['id'], 'side': rep['side'], 'icon': rep['icon'], 'title': rep['title'], 'lines': keep, 'nodes': nodes}
+    for k in ('kind', 'trap', 'link', 'story', 'start'):
+        if k in rep and rep['kind'] != 'rep': o[k] = rep[k]
+    out['reps'].append(o)
     print('%-8s %3d lines, %3d positions, %3d notes' % (rep['id'], len(keep), len(nodes), sum(1 for n in nodes.values() if 'note' in n)))
 
 if check:

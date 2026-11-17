@@ -14,6 +14,11 @@ function loadOpenings(){
 }
 function opState(){ if(!S.op||typeof S.op!=='object') S.op={lines:{},xp:0}; if(!S.op.lines) S.op.lines={}; return S.op; }
 function opRep(id){ return OPD&&OPD.reps.filter(function(r){return r.id===id})[0]; }
+function opReps(){ return OPD.reps.filter(function(r){ return !r.trap; }); }          // the three repertoires
+function opTraps(){ return OPD.reps.filter(function(r){ return !!r.trap; }); }        // trap-<id>-set / trap-<id>-avoid
+function opItems(reps,pred){ var o=[]; reps.forEach(function(r){ r.lines.forEach(function(l){ if(!pred||pred(r,l)) o.push({r:r,l:l}); }); }); return o; }
+function opGroupStats(reps){ return reps.map(opStats).reduce(function(a,s){ a.total+=s.total; a.seen+=s.seen; a.mastered+=s.mastered; a.due+=s.due; return a; },{total:0,seen:0,mastered:0,due:0}); }
+function opDot(rep,l){ var x=opState().lines[opKey(rep,l)]; return !x?'⚪':x.b>=3?'🟢':x.due<=today()?'🟠':'🟡'; }
 function opKey(rep,line){ return rep.id+'|'+line; }
 function opTitle(rep){ return rep.title[LANG]||rep.title.en; }
 function opNote(node){ return node&&node.note?(node.note[LANG]||node.note.en):''; }
@@ -22,8 +27,8 @@ function opStats(rep){
   rep.lines.forEach(function(l){ var x=o.lines[opKey(rep,l)]; if(!x) return; s.seen++; if(x.b>=3) s.mastered++; if(x.due<=td) s.due++; });
   return s;
 }
-function opDue(rep){ var o=opState(), td=today(); return rep.lines.filter(function(l){ var x=o.lines[opKey(rep,l)]; return x&&x.due<=td; })
-  .sort(function(a,b){ var x=o.lines[opKey(rep,a)], y=o.lines[opKey(rep,b)]; return x.due<y.due?-1:x.due>y.due?1:x.b-y.b; }); }
+function opDue(reps){ var o=opState(), td=today(); return opItems(reps,function(r,l){ var x=o.lines[opKey(r,l)]; return x&&x.due<=td; })
+  .sort(function(a,b){ var x=o.lines[opKey(a.r,a.l)], y=o.lines[opKey(b.r,b.l)]; return x.due<y.due?-1:x.due>y.due?1:x.b-y.b; }); }
 function opLearned(rep,line){ var o=opState(), k=opKey(rep,line); if(o.lines[k]) return; o.lines[k]={b:0,n:0,ok:0,due:today()}; o.xp=(+o.xp||0)+2; Store.saveSettings(); }
 /* a drilled line: right first time moves it up a box (seen again later), a mistake sends it back to box 0 */
 function opResult(rep,line,ok){
@@ -57,7 +62,7 @@ function liErr(e){ return e==='notoken'?t('Connect Lichess in the Openings tab t
 function vOpenings(){
   if(!OPD){ loadOpenings().then(function(){ if(location.hash==='#openings') render(); },function(){ toast(t('Couldn’t load the openings. Check your connection.')); }); return '<div class="card"><span class="spin"></span> '+t('Loading…')+'</div>'; }
   var h='<div class="card"><h2>📖 '+t('Openings')+'</h2><p class="sub">'+t('Learn a small repertoire by heart: first learn a line with the arrows, then drill it. Lines you know come back less often. Extra training — not part of the weekly plan.')+'</p></div>';
-  OPD.reps.forEach(function(rep){
+  opReps().forEach(function(rep){
     var s=opStats(rep), pct=Math.round(s.seen/s.total*100);
     h+='<div class="card oprep"><div class="ophead"><span class="opic">'+rep.icon+'</span><div><h2>'+esc(opTitle(rep))+'</h2>'+
        '<div class="sub">'+t('{a} of {b} lines learned',{a:s.seen,b:s.total})+' · '+t('{n} mastered',{n:s.mastered})+'</div></div></div>'+
@@ -69,11 +74,12 @@ function vOpenings(){
        '<details class="oplines"><summary>'+t('All lines')+'</summary>';
     var o=opState();
     rep.lines.forEach(function(l,i){
-      var x=o.lines[opKey(rep,l)], nm=rep.nodes[l].name||'', dot=!x?'⚪':x.b>=3?'🟢':x.due<=today()?'🟠':'🟡';
+      var nm=rep.nodes[l].name||'', dot=opDot(rep,l);
       h+='<button class="opline" data-act="oplearn" data-id="'+rep.id+'" data-i="'+i+'"><span>'+dot+'</span><span><b>'+esc(nm.replace(/^[^:]*: /,'')||nm)+'</b><br><small>'+esc(opPretty(l))+'</small></span></button>';
     });
     h+='<p class="note">⚪ '+t('new')+' · 🟠 '+t('due today')+' · 🟡 '+t('learning')+' · 🟢 '+t('mastered')+'</p></details></div>';
   });
+  h+=vTraps();
   var tok=liToken();
   h+='<div class="card"><h2>📊 '+t('Master statistics (Lichess)')+'</h2>';
   if(tok) h+='<p class="sub">✓ '+t('Connected. Explore shows how often masters play each move.')+' '+t('The token is kept only on this device.')+'</p><div class="btns"><button class="btn sm" data-act="litest">'+t('Test connection')+'</button><button class="btn ghost sm" data-act="lidel">'+t('Remove token')+'</button></div>';
@@ -82,12 +88,28 @@ function vOpenings(){
      '<form id="litoken" class="addprize"><input name="tok" type="password" autocomplete="off" placeholder="lip_…" required><button class="btn sm" type="submit">'+t('Save')+'</button></form>';
   return h+'</div>';
 }
+function vTraps(){
+  var tr=opTraps(), s=opGroupStats(tr), pct=Math.round(s.seen/s.total*100), by={}, order=[];
+  tr.forEach(function(r){ if(!by[r.trap]){ by[r.trap]={}; order.push(r.trap); } by[r.trap][r.kind]=r; });
+  var h='<div class="card oprep"><div class="ophead"><span class="opic">🪤</span><div><h2>'+t('Traps')+'</h2>'+
+    '<div class="sub">'+t('Learn each trap from both sides: spring it, and don’t fall for it.')+'</div></div></div>'+
+    '<div class="sub" style="margin-top:6px">'+t('{a} of {b} learned',{a:s.seen,b:s.total})+' · '+t('{n} mastered',{n:s.mastered})+'</div>'+
+    '<div class="bar"><i style="width:'+pct+'%"></i></div>'+
+    '<div class="btns"><button class="btn play" data-act="opdrill" data-id="traps"'+(s.seen?'':' disabled')+'>🧠 '+t('Drill traps')+(s.due?' <span class="due">'+s.due+'</span>':'')+'</button></div><div class="traps">';
+  order.forEach(function(id){
+    var set=by[id].set, av=by[id].avoid, lk=opRep(set.link);
+    h+='<div class="traprow"><div class="tn"><span class="ti">'+set.icon+'</span><span><b>'+esc(opTitle(set))+'</b><br><small>'+(lk?esc(opTitle(lk)):'')+'</small></span></div>'+
+       '<div class="tb"><button class="btn sm" data-act="oplearn" data-id="'+set.id+'" data-i="0">'+opDot(set,set.lines[0])+' ⚔️ '+t('Spring it')+'</button>'+
+       '<button class="btn sm" data-act="oplearn" data-id="'+av.id+'" data-i="0">'+opDot(av,av.lines[0])+' 🛡 '+t('Avoid it')+'</button></div></div>';
+  });
+  return h+'</div></div>';
+}
 function openOpening(mode,repId,lineIdx){
   loadOpenings().then(function(){
-    var rep=opRep(repId); if(!rep) return;
+    var group=(repId==='traps'||/^trap-/.test(repId))?opTraps():null, rep=repId==='traps'?group[0]:opRep(repId); if(!rep) return;
     if(L&&L.slot){ OP_SUSP=L; if(L.clock) L.clock.halt(); }       // keep a schedule lesson safe in the background
     if(L&&L.kind==='op') freeBoards(false);
-    L=newLessonObj(OpeningLesson(mode,rep,lineIdx),'op'); L.init();
+    L=newLessonObj(OpeningLesson(mode,rep,lineIdx,group||[rep],repId==='traps'),'op'); L.init();
     if(location.hash==='#lesson') render(); else location.hash='lesson';
   },function(){ toast(t('Couldn’t load the openings. Check your connection.')); });
 }
@@ -96,14 +118,15 @@ function closeOpening(){ location.hash='openings'; }
 function opLeft(){ if(location.hash!=='#lesson'&&L&&L.kind==='op'){ freeBoards(false); L=OP_SUSP; OP_SUSP=null; } }
 
 /* ---------- learn / drill / explore ---------- */
-function OpeningLesson(mode,rep,lineIdx){
-  var L={title:(mode==='learn'?t('Learn'):mode==='drill'?t('Drill'):t('Explore'))+' · '+opTitle(rep),home:'openings'};
+function OpeningLesson(mode,rep,lineIdx,group,allTraps){
+  var L={title:(mode==='learn'?t('Learn'):mode==='drill'?t('Drill'):t('Explore'))+' · '+(allTraps?'🪤 '+t('Traps'):opTitle(rep)+(rep.trap?' · '+(rep.kind==='set'?t('Spring it'):t('Avoid it')):'')),home:'openings'};
   var side=rep.side, st={mode:mode,g:new Chess(),last:null,line:null,plies:[],i:0,status:'',msg:'',mcls:'info',marks:{},fails:0,
     queue:[],requeued:{},done:0,okN:0,mv:[],vi:null,stats:null,statsKey:''};
   function node(n){ return rep.nodes[st.plies.slice(0,n).join(' ')]; }
   function verbose(g,san){ var c=new Chess(g.fen()); return tryMove(c,san); }
 
-  function startLine(line){
+  function startLine(item){
+    rep=item.r; side=rep.side; var line=item.l; st.opp='';
     st.line=line; st.plies=line.split(' '); st.i=0; st.fails=0; st.g=new Chess(); st.last=null; st.marks={}; st.missed=false; step();
   }
   function step(){
@@ -111,14 +134,16 @@ function OpeningLesson(mode,rep,lineIdx){
     var n=node(st.i+1);
     if(!n.ours){
       st.status='auto'; st.marks={}; var me=st.line, i=st.i; lr();
-      setTimeout(function(){ if(L.st!==st||st.line!==me||st.i!==i) return; st.last=tryMove(st.g,st.plies[st.i]); st.i++; step(); }, st.i===0?450:650);
+      setTimeout(function(){ if(L.st!==st||st.line!==me||st.i!==i) return; st.last=tryMove(st.g,st.plies[st.i]); st.i++;
+        var on=node(st.i); if(on&&on.note) st.opp=opNote(on); step(); }, st.i<(rep.start||0)?280:st.i===0?450:650);
       return;
     }
     st.status='move'; st.marks={};
     var exp=verbose(st.g,st.plies[st.i]), nm=node(st.i)&&node(st.i).name;
+    var pre=st.opp?'👀 '+esc(st.opp)+'<br>':''; st.opp='';
     if(st.mode==='learn'){ st.marks[exp.from]='hint'; st.marks[exp.to]='hint';
-      st.msg=(opNote(n)?'💡 '+esc(opNote(n))+'<br>':'')+t('Play {m} — follow the arrow.',{m:'<b>'+esc(ls(exp.san))+'</b>'}); st.mcls='info'; }
-    else { st.msg=t('Your move! What does our repertoire play here?'); st.mcls='info'; }
+      st.msg=pre+(opNote(n)?'💡 '+esc(opNote(n))+'<br>':'')+t('Play {m} — follow the arrow.',{m:'<b>'+esc(ls(exp.san))+'</b>'}); st.mcls='info'; }
+    else { st.msg=pre+(rep.trap?(rep.kind==='set'?t('Your move! How does the trap go?'):t('Careful! What is the safe move here?')):t('Your move! What does our repertoire play here?')); st.mcls='info'; }
     lr();
   }
   function onMove(mv){
@@ -138,13 +163,15 @@ function OpeningLesson(mode,rep,lineIdx){
   }
   function endLine(){
     var nm=rep.nodes[st.line].name||'';
-    if(st.mode==='learn'){ opLearned(rep,st.line); st.status='done'; st.msg='🎉 '+t('Line learned!')+(nm?' <b>'+esc(nm)+'</b>':''); st.mcls='ok'; Sound.play('Victory'); lr(); return; }
+    var fin=st.opp?'👀 '+esc(st.opp)+'<br>':''; st.opp='';
+    if(rep.trap){ var last=node(st.plies.length); if(last&&last.note&&last.ours) fin='💡 '+esc(opNote(last))+'<br>'; nm=''; fin+=(rep.kind==='set'?'🪤 '+t('Trap sprung!'):'🛡 '+t('Trap avoided!'))+' '; }
+    if(st.mode==='learn'){ opLearned(rep,st.line); st.status='done'; st.msg=fin+(rep.trap?'':'🎉 '+t('Line learned!'))+(nm?' <b>'+esc(nm)+'</b>':''); st.mcls='ok'; Sound.play('Victory'); lr(); return; }
     var ok=st.fails===0; opResult(rep,st.line,ok); st.done++; if(ok) st.okN++;
-    if(!ok&&!st.requeued[st.line]){ st.requeued[st.line]=1; st.queue.push(st.line); }
-    st.status='lineend'; st.msg=ok?'✓ '+t('Perfect line!')+' +3 XP':'↻ '+t('One mistake — this line comes back soon.'); st.mcls=ok?'ok':'no';
+    var key=opKey(rep,st.line); if(!ok&&!st.requeued[key]){ st.requeued[key]=1; st.queue.push({r:rep,l:st.line}); }
+    st.status='lineend'; st.msg=fin+(ok?'✓ '+t('Perfect line!')+' +3 XP':'↻ '+t('One mistake — this line comes back soon.')); st.mcls=ok?'ok':'no';
     if(ok) Sound.play('GenericNotify');
     lr();
-    var me=st.line; setTimeout(function(){ if(L.st===st&&st.line===me&&st.status==='lineend') nextDrill(); }, 1400);
+    var me=st.line; setTimeout(function(){ if(L.st===st&&st.line===me&&st.status==='lineend') nextDrill(); }, rep.trap?2600:1400);
   }
   function nextDrill(){
     if(!st.queue.length){ st.status='summary'; st.line=null; lr(); return; }
@@ -211,6 +238,7 @@ function OpeningLesson(mode,rep,lineIdx){
       '<div class="btns"><button class="btn play" data-l="again">'+t('Practise more')+'</button><button class="btn ghost" data-l="home">'+t('Back to openings')+'</button></div></div>';
     var nm=(node(st.i)&&node(st.i).name)||'';
     h+='<div class="lbar"><span class="pill">'+(nm?esc(nm):t('Starting position'))+'</span>'+(st.mode==='drill'?'<span class="pill">'+t('Line {a} · {b} left',{a:st.done+1,b:st.queue.length})+'</span>':'')+'</div>';
+    if(rep.trap&&st.mode==='learn'&&rep.story) h+='<div class="msg story">'+(rep.kind==='set'?'⚔️ ':'🛡 ')+esc(rep.story[LANG]||rep.story.en)+'</div>';
     h+='<div id="opb"></div><div class="msg '+st.mcls+'">'+st.msg+'</div>';
     if(st.status==='move'&&st.mode==='drill') h+='<button class="btn ghost sm" data-l="hint">💡 '+t('Show the move')+'</button>';
     if(st.status==='done') h+='<div class="btns"><button class="btn play" data-l="next">➕ '+t('Learn the next line')+'</button><button class="btn" data-l="todrill">🧠 '+t('Drill')+'</button><button class="btn ghost" data-l="home">'+t('Back to openings')+'</button></div>';
@@ -243,17 +271,17 @@ function OpeningLesson(mode,rep,lineIdx){
     else if(a==='totree'){ var n=st.mv.length; while(n>0&&!rep.nodes.hasOwnProperty(exPath(n))) n--; st.mv=st.mv.slice(0,n); st.vi=null; lr(); exFetch(); }
     else if(a==='hint'){ if(st.status!=='move') return; if(!st.missed){ st.missed=true; st.fails++; } var exp=verbose(st.g,st.plies[st.i]); st.marks={}; st.marks[exp.from]='hint'; st.marks[exp.to]='hint'; st.msg=t('Our move here is {m}. Play it to continue.',{m:'<b>'+esc(ls(exp.san))+'</b>'}); st.mcls='no'; lr(); }
     else if(a==='next'){ var nx=nextNew(); if(nx) startLine(nx); else { st.status='none'; lr(); } }
-    else if(a==='todrill') openOpening('drill',rep.id);
+    else if(a==='todrill') openOpening('drill',rep.trap?'traps':rep.id);
     else if(a==='again'){ st.queue=practice(); st.done=st.okN=0; st.requeued={}; nextDrill(); }
     else if(a==='home') closeOpening();
   };
-  function nextNew(){ var o=opState(); return rep.lines.filter(function(l){ return !o.lines[opKey(rep,l)]; })[0]; }
-  function practice(){ var o=opState(); return rep.lines.filter(function(l){ return o.lines[opKey(rep,l)]; }).sort(function(){ return Math.random()-.5; }).slice(0,8); }
+  function nextNew(){ var o=opState(); return opItems(group,function(r,l){ return !o.lines[opKey(r,l)]; })[0]; }
+  function practice(){ var o=opState(); return opItems(group,function(r,l){ return !!o.lines[opKey(r,l)]; }).sort(function(){ return Math.random()-.5; }).slice(0,8); }
 
   L.init=function(){
     if(mode==='explore'){ st.status='explore'; exFetch(); }
-    else if(mode==='learn'){ var ln=lineIdx!=null?rep.lines[lineIdx]:nextNew(); if(ln) startLine(ln); else st.status='none'; }
-    else { st.queue=opDue(rep); if(!st.queue.length) st.queue=practice(); if(st.queue.length) startLine(st.queue.shift()); else st.status='none'; }
+    else if(mode==='learn'){ var ln=lineIdx!=null?{r:rep,l:rep.lines[lineIdx]}:nextNew(); if(ln) startLine(ln); else st.status='none'; }
+    else { st.queue=opDue(group); if(!st.queue.length) st.queue=practice(); if(st.queue.length) startLine(st.queue.shift()); else st.status='none'; }
   };
   return L;
 }

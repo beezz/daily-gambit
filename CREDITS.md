@@ -12,7 +12,7 @@
 | **Master games** by José Raúl Capablanca and Akiba Rubinstein (game scores, 1900s–1930s) | `public/data/games.json` | historical game records | PGNs via https://github.com/rozim/ChessData (PgnMentor) |
 | **Fonts** Fredoka and Nunito (self-hosted woff2, latin + latin-ext, from @fontsource 5.3.0) | `public/fonts/` | SIL Open Font License 1.1 (`public/fonts/OFL-*.txt`) | https://fonts.google.com · https://fontsource.org |
 
-The otter mascot, the app code, the opening repertoire (lines and explanations) and the endgame position set were made for this project and are released under GPL-3.0-or-later with the rest of the app.
+The otter mascot, the app code, the opening repertoire and traps (lines, stories and explanations) and the endgame position set were made for this project and are released under GPL-3.0-or-later with the rest of the app.
 
 "Pokémon" appears only as the plain-text name of a default real-world reward a parent can give; no Pokémon artwork or other assets are included. Pokémon is a trademark of Nintendo / Creatures Inc. / GAME FREAK Inc.; this project is not affiliated with them, nor with Lichess.
 

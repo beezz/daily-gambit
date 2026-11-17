@@ -46,7 +46,7 @@ src/            app source — i18n.js, core.js (data, scoring, storage, board, 
 public/         static files copied as-is: libraries, Stockfish, puzzle/game data, sounds, css,
                 fonts, icons, manifest, Cloudflare _headers
 tools/          scripts that generated the data and checked the endgame positions;
-                openings_src.py is the opening repertoire, build_openings.py builds and
+                openings_src.py is the opening repertoire and traps, build_openings.py builds and
                 Stockfish-checks it (python3 tools/build_openings.py <chess-openings dir> --check)
 tests/          end-to-end browser tests (Playwright + Chrome)
 build.py        joins src/ + public/ into dist/ and generates dist/sw.js

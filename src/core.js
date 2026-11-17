@@ -39,6 +39,7 @@ var BADGES = [
   {id:'endgame',g:'♜',n:'Endgame Expert',d:'Solve all 9 endgame positions',ok:function(c){return c.egSolved>=9}},
   {id:'master',g:'♝',n:'Master Detective',d:'8 guess-the-move games',ok:function(c){return c.by.wed>=8}},
   {id:'opening',g:'📖',n:'Opening Scholar',d:'Master 10 opening lines',ok:function(c){return c.opMastered>=10}},
+  {id:'traps',g:'🪤',n:'Trap Detective',d:'Master 6 trap lines',ok:function(c){return c.trapMastered>=6}},
   {id:'blind',g:'🙈',n:'Blindfold Ninja',d:'8 blindfold & threat sessions',ok:function(c){return c.by.fri>=8}},
   {id:'hunter',g:'🔍',n:'Blunder Hunter',d:'Tag 20 of your own blunders',ok:function(c){return c.blunders>=20}},
   {id:'iron',g:'🧠',n:'Iron Focus',d:'1,000 minutes of training',ok:function(c){return c.minutes>=1000}}
@@ -111,7 +112,7 @@ function compute(){
   });
   Object.keys(weeks).forEach(function(w){ if(SLOTS.every(function(s){return weeks[w][s.k]})) c.perfect++; });
   c.xp+=c.perfect*150;
-  var op=S.op||{}; c.xp+=(+op.xp||0); c.opMastered=Object.keys(op.lines||{}).filter(function(k){return op.lines[k].b>=3}).length;
+  var op=S.op||{}; c.xp+=(+op.xp||0); c.opMastered=Object.keys(op.lines||{}).filter(function(k){return op.lines[k].b>=3&&k.indexOf('trap-')!==0}).length; c.trapMastered=Object.keys(op.lines||{}).filter(function(k){return op.lines[k].b>=3&&k.indexOf('trap-')===0}).length;
   ses.forEach(function(t){
     if(t.slot!=='thu'||!t.wp||!t.wp.n||t.excused) return;
     var w=wkOf(t.date), mons=ses.filter(function(m){return m.slot==='mon'&&m.wp&&m.wp.n&&!m.excused&&wkOf(m.date)===w});
