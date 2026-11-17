@@ -9,6 +9,21 @@ function t(en,v){
   return s;
 }
 var DICT={
+'Backup':['Záloha','Sicherung'],
+'Progress is saved on this device. Keep a backup file in case the phone is lost or the app is removed.':['Pokrok sa ukladá v tomto zariadení. Maj odloženú záložnú kópiu pre prípad, že sa telefón stratí alebo sa aplikácia odinštaluje.','Der Fortschritt wird auf diesem Gerät gespeichert. Bewahre eine Sicherung auf, falls das Handy verloren geht oder die App gelöscht wird.'],
+'Save a copy of all progress, or move it to another device or to the offline app.':['Ulož si kópiu celého pokroku alebo ho presuň do iného zariadenia či do offline aplikácie.','Speichere eine Kopie des gesamten Fortschritts oder übertrage ihn auf ein anderes Gerät oder in die Offline-App.'],
+'Last backup:':['Posledná záloha:','Letzte Sicherung:'],'never':['nikdy','nie'],'today':['dnes','heute'],'{n} days ago':['pred {n} dňami','vor {n} Tagen'],
+'Download backup':['Stiahnuť zálohu','Sicherung herunterladen'],'Copy backup':['Kopírovať zálohu','Sicherung kopieren'],'Restore from backup…':['Obnoviť zo zálohy…','Aus Sicherung wiederherstellen…'],
+'It’s been a while since the last backup. Save one in the Log tab.':['Dlho si nerobil zálohu. Ulož ju v karte Záznam.','Die letzte Sicherung ist schon eine Weile her. Speichere eine im Tab Protokoll.'],
+'Backup saved':['Záloha uložená','Sicherung gespeichert'],
+'Copy this text and keep it somewhere safe (e.g. a note or an email to yourself). Paste it into “Restore from backup” to bring everything back.':['Skopíruj tento text a odlož si ho na bezpečné miesto (napr. do poznámky alebo e-mailu sebe). Vložením do „Obnoviť zo zálohy“ sa všetko vráti.','Kopiere diesen Text und bewahre ihn sicher auf (z. B. in einer Notiz oder einer E-Mail an dich selbst). Füge ihn bei „Aus Sicherung wiederherstellen“ ein, um alles zurückzuholen.'],
+'Copy':['Kopírovať','Kopieren'],'Copied':['Skopírované','Kopiert'],'Could not create the backup':['Zálohu sa nepodarilo vytvoriť','Sicherung konnte nicht erstellt werden'],
+'Restore from backup':['Obnoviť zo zálohy','Aus Sicherung wiederherstellen'],'Choose a backup file or paste the backup text.':['Vyber súbor so zálohou alebo vlož text zálohy.','Wähle eine Sicherungsdatei oder füge den Sicherungstext ein.'],
+'…or paste the backup text here':['…alebo sem vlož text zálohy','…oder füge den Sicherungstext hier ein'],
+'Replace all data?':['Nahradiť všetky údaje?','Alle Daten ersetzen?'],
+'Backup from {d} · logged sessions: {n}. Everything currently in the app will be replaced by it.':['Záloha z {d} · zapísané tréningy: {n}. Všetko, čo je teraz v aplikácii, sa ňou nahradí.','Sicherung vom {d} · eingetragene Einheiten: {n}. Alles, was jetzt in der App ist, wird dadurch ersetzt.'],
+'Restore':['Obnoviť','Wiederherstellen'],'That is not a Daily Gambit backup':['Toto nie je záloha Daily Gambit','Das ist keine Daily-Gambit-Sicherung'],
+'Backup restored':['Záloha obnovená','Sicherung wiederhergestellt'],'Could not restore the backup':['Zálohu sa nepodarilo obnoviť','Sicherung konnte nicht wiederhergestellt werden'],
 'Stockfish says this position is now lost.':['Stockfish hovorí, že táto pozícia je už prehraná.','Stockfish sagt, diese Stellung ist jetzt verloren.'],
 'The win slipped away — Stockfish says this is only a draw now.':['Výhra sa vytratila — podľa Stockfishu je to už len remíza.','Der Sieg ist weg — laut Stockfish ist es jetzt nur noch remis.'],
 'Better was {m}.':['Lepšie bolo {m}.','Besser war {m}.'],
