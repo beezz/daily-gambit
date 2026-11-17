@@ -66,6 +66,14 @@ function clone(o){return JSON.parse(JSON.stringify(o))}
 function shuffle(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t}return a}
 function lsGet(k){try{return JSON.parse(localStorage.getItem(k)||'null')}catch(e){return null}}
 function lsSet(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+/* ---------------- players ----------------
+   Several players share one app. The active player is chosen per device (dg_user); switching
+   reloads the page. Player 'main' keeps the original storage names, so existing progress stays put. */
+var UID=lsGet('dg_user')||'main';
+var USERS=null;                                   // [{id,name}] once loaded
+function K(n,u){ u=u||UID; return u==='main'?'ctq2_'+n:'ctq2u_'+u+'_'+n; }          // localStorage key
+function C(n,u){ u=u||UID; return u==='main'?n:'u_'+u+'_'+n; }                      // db collection
+function SDOC(u){ return C('progress',u)+'/settings'; }                               // db settings doc
 
 /* ---------------- scoring ---------------- */
 function accOf(s){ if(s.wp && s.wp.n>0) return Math.round(s.wp.ok/s.wp.n*100); return (s.acc===0||s.acc)?s.acc:null; }
@@ -153,28 +161,29 @@ var Store = {
     var self=this, p=null;
     var hosted=false;
     try{ if(window.claude && typeof window.claude.use==='function'){ hosted=true; p=window.claude.use('db'); } }catch(e){}
-    if(!hosted){ self.mode='device'; self.loadLocal(); self.persist(); render(); return; }   // installed / offline app: everything lives on this device
+    var users=function(){ self.loadUsers().then(function(){ if(!inLesson()) render(); }); };
+    if(!hosted){ self.mode='device'; self.loadLocal(); self.persist(); users(); render(); return; }   // installed / offline app: everything lives on this device
     Promise.resolve(p).then(function(db){
-      if(!db){ self.mode='local'; self.loadLocal(); render(); return; }
-      self.db=db; self.mode='live'; self.slowTimer=setTimeout(function(){self.slow=true; if(!inLesson()) render();},10000);
+      if(!db){ self.mode='local'; self.loadLocal(); users(); render(); return; }
+      self.db=db; self.mode='live'; users(); self.slowTimer=setTimeout(function(){self.slow=true; if(!inLesson()) render();},10000);
       var got={settings:false,sessions:false};
       var done=function(){ if(got.settings&&got.sessions){ clearTimeout(self.slowTimer); self.slow=false; self.loaded=true; if(!inLesson()) render(); } };
-      db.doc('progress/settings').onSnapshot(function(snap){
+      db.doc(SDOC()).onSnapshot(function(snap){
         if(snap.exists){ var d=snap.data()||{}; var keep=S.sessions; S=Object.assign(clone(DEFAULT_STATE), clone(d)); S.sessions=keep; setLang(S.lang); }
         if(!snap.metadata.fromCache){ got.settings=true; } done(); if(self.loaded && !inLesson()) render();
       }, function(e){ self.fail(e); });
-      db.collection('rewards').onSnapshot(function(qs){ REWARDS=qs.docs.map(function(d){return clone(d.data())}); if(self.loaded && !inLesson()) render(); }, function(e){ self.fail(e); });
-      db.collection('sessions').onSnapshot(function(qs){
+      db.collection(C('rewards')).onSnapshot(function(qs){ REWARDS=qs.docs.map(function(d){return clone(d.data())}); if(self.loaded && !inLesson()) render(); }, function(e){ self.fail(e); });
+      db.collection(C('sessions')).onSnapshot(function(qs){
         S.sessions=qs.docs.map(function(d){return clone(d.data())});
         if(!qs.metadata.fromCache){ got.sessions=true; } done(); if(self.loaded && !inLesson()) render();
       }, function(e){ self.fail(e); });
-    }).catch(function(){ self.mode='local'; self.loadLocal(); render(); });
+    }).catch(function(){ self.mode='local'; self.loadLocal(); users(); render(); });
   },
   isLocal:function(){ return this.mode==='local'||this.mode==='device'; },
   persist:function(){ try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(function(){}); }catch(e){} },
   allNotebooks:function(){
-    if(this.mode==='live') return this.db.collection('notebooks').get().then(function(qs){ var o={}; qs.docs.forEach(function(d){ o[d.id]=clone(d.data()); }); return o; });
-    var o={}; try{ Object.keys(localStorage).forEach(function(k){ if(k.indexOf('ctq2_nb_')===0) o[k.slice(8)]=lsGet(k); }); }catch(e){}
+    if(this.mode==='live') return this.db.collection(C('notebooks')).get().then(function(qs){ var o={}; qs.docs.forEach(function(d){ o[d.id]=clone(d.data()); }); return o; });
+    var o={}; try{ Object.keys(localStorage).forEach(function(k){ if(k.indexOf(K('nb_'))===0) o[k.slice(K('nb_').length)]=lsGet(k); }); }catch(e){}
     return Promise.resolve(o);
   },
   exportData:function(){
@@ -188,46 +197,86 @@ var Store = {
     st.sessions=(st.sessions||[]).filter(function(x){return x&&x.id&&x.slot&&x.date});
     return this.resetAll().then(function(){
       S=st; REWARDS=rw; setLang(S.lang);
-      if(self.isLocal()){ self.saveLocal(); Object.keys(nbs).forEach(function(id){ lsSet('ctq2_nb_'+id,nbs[id]); }); return; }
+      if(self.isLocal()){ self.saveLocal(); Object.keys(nbs).forEach(function(id){ lsSet(K('nb_')+id,nbs[id]); }); return; }
       if(self.mode!=='live') return;
       var db=self.db, body=self.settingsBody();
       return self.q(function(){
-        return db.doc('progress/settings').set(body)
-          .then(function(){ return Promise.all(S.sessions.map(function(x){ return db.collection('sessions').doc(x.id).set(clone(x)); })); })
-          .then(function(){ return Promise.all(REWARDS.map(function(x){ return db.collection('rewards').doc(x.id).set(clone(x)); })); })
-          .then(function(){ return Promise.all(Object.keys(nbs).map(function(id){ return db.collection('notebooks').doc(id).set(nbs[id]); })); });
+        return db.doc(SDOC()).set(body)
+          .then(function(){ return Promise.all(S.sessions.map(function(x){ return db.collection(C('sessions')).doc(x.id).set(clone(x)); })); })
+          .then(function(){ return Promise.all(REWARDS.map(function(x){ return db.collection(C('rewards')).doc(x.id).set(clone(x)); })); })
+          .then(function(){ return Promise.all(Object.keys(nbs).map(function(id){ return db.collection(C('notebooks')).doc(id).set(nbs[id]); })); });
       });
     });
   },
   fail:function(e){ clearTimeout(this.slowTimer); if(e && (e.code==='revoked'||e.code==='not_granted')) this.mode='readonly'; else this.slow=true; if(!inLesson()) render(); },
-  loadLocal:function(){ var ls=lsGet('ctq2_state'); if(ls){ S=Object.assign(clone(DEFAULT_STATE),ls); setLang(S.lang); } REWARDS=lsGet('ctq2_rewards')||[]; this.loaded=true; },
-  saveLocal:function(){ lsSet('ctq2_state',S); lsSet('ctq2_rewards',REWARDS); },
+  loadLocal:function(){ var ls=lsGet(K('state')); if(ls){ S=Object.assign(clone(DEFAULT_STATE),ls); setLang(S.lang); } REWARDS=lsGet(K('rewards'))||[]; this.loaded=true; },
+  saveLocal:function(){ lsSet(K('state'),S); lsSet(K('rewards'),REWARDS); },
   settingsBody:function(){ var o=clone(S); delete o.sessions; return o; },
   q:function(fn){ var self=this; var p=this.chain.then(fn).catch(function(e){ self.err(e); }); this.chain=p; return p; },
   err:function(e){ var code=e&&e.code; if(code==='invalid_argument'||code==='not_granted'||code==='revoked'){ this.mode='readonly'; render(); toast(t('View only — this account can’t save here')); } else if(code==='quota_exceeded'){ toast(t('Storage is full — delete old sessions')); } else toast(t('Could not save — check your connection')); },
-  saveSettings:function(){ if(this.isLocal()){this.saveLocal();return Promise.resolve();} if(this.mode!=='live') return Promise.resolve(); var self=this, body=this.settingsBody(); return this.q(function(){ return self.db.doc('progress/settings').set(body); }); },
-  addSession:function(s){ if(this.isLocal()){this.saveLocal();return Promise.resolve();} if(this.mode!=='live') return Promise.resolve(); var self=this; return this.q(function(){ return self.db.collection('sessions').doc(s.id).set(clone(s)); }); },
-  delSession:function(id){ if(this.isLocal()){this.saveLocal();return Promise.resolve();} if(this.mode!=='live') return Promise.resolve(); var self=this; return this.q(function(){ return self.db.collection('sessions').doc(id).delete(); }); },
-  saveNotebook:function(id,nb){ if(this.isLocal()){ lsSet('ctq2_nb_'+id,nb); return Promise.resolve(); } if(this.mode!=='live') return Promise.resolve(); var self=this; return this.q(function(){ return self.db.collection('notebooks').doc(id).set(clone(nb)); }); },
-  saveReward:function(r){ if(this.isLocal()){this.saveLocal();return Promise.resolve();} if(this.mode!=='live') return Promise.resolve(); var self=this; return this.q(function(){ return self.db.collection('rewards').doc(r.id).set(clone(r)); }); },
+  saveSettings:function(){ if(this.isLocal()){this.saveLocal();return Promise.resolve();} if(this.mode!=='live') return Promise.resolve(); var self=this, body=this.settingsBody(); return this.q(function(){ return self.db.doc(SDOC()).set(body); }); },
+  addSession:function(s){ if(this.isLocal()){this.saveLocal();return Promise.resolve();} if(this.mode!=='live') return Promise.resolve(); var self=this; return this.q(function(){ return self.db.collection(C('sessions')).doc(s.id).set(clone(s)); }); },
+  delSession:function(id){ if(this.isLocal()){this.saveLocal();return Promise.resolve();} if(this.mode!=='live') return Promise.resolve(); var self=this; return this.q(function(){ return self.db.collection(C('sessions')).doc(id).delete(); }); },
+  saveNotebook:function(id,nb){ if(this.isLocal()){ lsSet(K('nb_')+id,nb); return Promise.resolve(); } if(this.mode!=='live') return Promise.resolve(); var self=this; return this.q(function(){ return self.db.collection(C('notebooks')).doc(id).set(clone(nb)); }); },
+  saveReward:function(r){ if(this.isLocal()){this.saveLocal();return Promise.resolve();} if(this.mode!=='live') return Promise.resolve(); var self=this; return this.q(function(){ return self.db.collection(C('rewards')).doc(r.id).set(clone(r)); }); },
   resetAll:function(){
     var self=this, ids=S.sessions.map(function(x){return x.id}), rids=REWARDS.map(function(x){return x.id}), lang=S.lang;
     S=clone(DEFAULT_STATE); S.lang=lang; REWARDS=[];
-    ['ctq2_pend','ctq2_wk','ctq2_state','ctq2_rewards'].forEach(function(k){ lsSet(k,null); });
-    try{ Object.keys(localStorage).forEach(function(k){ if(k.indexOf('ctq2_nb_')===0) localStorage.removeItem(k); }); }catch(e){}
+    Store.wipeLocal(UID);
     if(this.isLocal()){ this.saveLocal(); return Promise.resolve(); }
     if(this.mode!=='live') return Promise.resolve();
     var db=this.db, body=this.settingsBody();
     return this.q(function(){
-      var jobs=ids.map(function(id){ return db.collection('sessions').doc(id).delete(); })
-        .concat(rids.map(function(id){ return db.collection('rewards').doc(id).delete(); }));
+      var jobs=ids.map(function(id){ return db.collection(C('sessions')).doc(id).delete(); })
+        .concat(rids.map(function(id){ return db.collection(C('rewards')).doc(id).delete(); }));
       return Promise.all(jobs)
-        .then(function(){ return db.collection('notebooks').get(); })
-        .then(function(qs){ return Promise.all(qs.docs.map(function(d){ return db.collection('notebooks').doc(d.id).delete(); })); })
-        .then(function(){ return db.doc('progress/settings').set(body); });
+        .then(function(){ return db.collection(C('notebooks')).get(); })
+        .then(function(qs){ return Promise.all(qs.docs.map(function(d){ return db.collection(C('notebooks')).doc(d.id).delete(); })); })
+        .then(function(){ return db.doc(SDOC()).set(body); });
     });
   },
-  getNotebook:function(id){ if(this.mode==='live') return this.db.collection('notebooks').doc(id).get().then(function(s){return s.exists?s.data():null}); return Promise.resolve(lsGet('ctq2_nb_'+id)); }
+  /* ---- players ---- */
+  wipeLocal:function(u){
+    ['pend','wk','state','rewards'].forEach(function(n){ lsSet(K(n,u),null); });
+    try{ var pre=K('nb_',u); Object.keys(localStorage).forEach(function(k){ if(k.indexOf(pre)===0) localStorage.removeItem(k); }); }catch(e){}
+  },
+  loadUsers:function(){
+    var fix=function(list){ list=(list||[]).filter(function(x){return x&&x.id}); if(!list.length) list=[{id:'main',name:''}]; if(!list.some(function(x){return x.id===UID})) list.push({id:UID,name:''}); USERS=list; return list; };
+    if(this.mode==='live') return this.db.doc('meta/users').get().then(function(s){ return fix(s.exists?(s.data()||{}).list:null); }).catch(function(){ return fix(null); });
+    return Promise.resolve(fix(lsGet('dg_users')));
+  },
+  saveUsers:function(){
+    var list=clone(USERS||[]);
+    if(this.isLocal()){ lsSet('dg_users',list); return Promise.resolve(); }
+    if(this.mode!=='live') return Promise.resolve();
+    var self=this; return this.q(function(){ return self.db.doc('meta/users').set({list:list}); });
+  },
+  userName:function(u){ return (u.id===UID?S.player:u.name)||u.name||t('Player'); },
+  syncName:function(){ if(!USERS) return; var me=USERS.filter(function(x){return x.id===UID})[0]; if(me&&me.name!==S.player){ me.name=S.player; this.saveUsers(); } },
+  addUser:function(name){
+    var u={id:uid(),name:name}; USERS=(USERS||[]).concat([u]);
+    var st=clone(DEFAULT_STATE); st.player=name; st.lang=S.lang; st.sound=S.sound; st.skill=S.skill; st.catalog=clone(S.catalog||DEFAULT_CATALOG);
+    var self=this, p=Promise.resolve();
+    if(this.isLocal()) lsSet(K('state',u.id),st);
+    else if(this.mode==='live'){ var body=clone(st); delete body.sessions; p=this.q(function(){ return self.db.doc(SDOC(u.id)).set(body); }); }
+    return p.then(function(){ return self.saveUsers(); }).then(function(){ return u; });
+  },
+  switchUser:function(id){ var go=function(){ lsSet('dg_user',id); location.hash='today'; location.reload(); }; this.chain.then(go,go); },
+  deleteUser:function(id){
+    var self=this; USERS=(USERS||[]).filter(function(x){return x.id!==id});
+    this.wipeLocal(id);
+    var p=Promise.resolve();
+    if(this.mode==='live'){
+      var db=this.db;
+      p=this.q(function(){
+        return Promise.all(['sessions','rewards','notebooks'].map(function(n){
+          return db.collection(C(n,id)).get().then(function(qs){ return Promise.all(qs.docs.map(function(d){ return db.collection(C(n,id)).doc(d.id).delete(); })); });
+        })).then(function(){ return db.doc(SDOC(id)).delete(); });
+      });
+    }
+    return p.then(function(){ return self.saveUsers(); });
+  },
+  getNotebook:function(id){ if(this.mode==='live') return this.db.collection(C('notebooks')).doc(id).get().then(function(s){return s.exists?s.data():null}); return Promise.resolve(lsGet(K('nb_')+id)); }
 };
 
 /* ---------------- data files ---------------- */

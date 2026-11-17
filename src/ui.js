@@ -3,7 +3,7 @@
 var draft={slot:SLOTS[slotIdxOf(new Date())].k}, pendingDel=null, pendingCycle=false, overlay=null, pendingGive=null, resetWord='';
 var TABS=[['today','♟','Today'],['week','📅','Week'],['woodpecker','🐦','Puzzles'],['prizes','🎁','Prizes'],['history','📜','Log']];
 var MASCOT='<svg viewBox="0 0 120 120" aria-hidden="true"><ellipse cx="60" cy="113" rx="34" ry="5" fill="#000" opacity=".08"/><path d="M86 100 q26 4 24 -22 q-2 -10 -8 -8 q4 14 -18 18 Z" fill="#7a5233"/><ellipse cx="60" cy="88" rx="31" ry="25" fill="#8b5e3c"/><ellipse cx="60" cy="92" rx="20" ry="19" fill="#f0d9b5"/><circle cx="35" cy="28" r="8" fill="#8b5e3c"/><circle cx="35" cy="28" r="4" fill="#5c3d24"/><circle cx="85" cy="28" r="8" fill="#8b5e3c"/><circle cx="85" cy="28" r="4" fill="#5c3d24"/><circle cx="60" cy="48" r="29" fill="#a0714b"/><ellipse cx="60" cy="60" rx="21" ry="15" fill="#f0d9b5"/><circle cx="47" cy="44" r="5.5" fill="#3b2a1d"/><circle cx="73" cy="44" r="5.5" fill="#3b2a1d"/><circle cx="48.8" cy="42.2" r="1.9" fill="#fff"/><circle cx="74.8" cy="42.2" r="1.9" fill="#fff"/><circle cx="39" cy="56" r="4.5" fill="#e8a08a" opacity=".55"/><circle cx="81" cy="56" r="4.5" fill="#e8a08a" opacity=".55"/><ellipse cx="60" cy="54" rx="6.5" ry="4.5" fill="#3b2a1d"/><ellipse cx="58" cy="52.8" rx="2" ry="1.1" fill="#fff" opacity=".6"/><path d="M54 61 q3 4 6 0 q3 4 6 0" stroke="#3b2a1d" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M45 58 L31 55 M45 61 L31 63 M75 58 L89 55 M75 61 L89 63" stroke="#5c3d24" stroke-width="1.6" stroke-linecap="round" opacity=".7"/><g transform="translate(60 92)"><circle cx="0" cy="-12" r="5.5" fill="#fff" stroke="#5c3d24" stroke-width="1.8"/><path d="M-4 -6 h8 l3 12 h-14 Z" fill="#fff" stroke="#5c3d24" stroke-width="1.8" stroke-linejoin="round"/><rect x="-9" y="5" width="18" height="5" rx="2" fill="#fff" stroke="#5c3d24" stroke-width="1.8"/></g><ellipse cx="46" cy="90" rx="8" ry="6" fill="#7a5233"/><ellipse cx="74" cy="90" rx="8" ry="6" fill="#7a5233"/><ellipse cx="46" cy="108" rx="9" ry="5" fill="#7a5233"/><ellipse cx="74" cy="108" rx="9" ry="5" fill="#7a5233"/></svg>';
-function tab(){var h=(location.hash||'').slice(1); if(h==='lesson') return L?'lesson':'today'; return TABS.some(function(x){return x[0]===h})?h:'today'}
+function tab(){var h=(location.hash||'').slice(1); if(h==='lesson') return L?'lesson':'today'; if(h==='users') return 'users'; return TABS.some(function(x){return x[0]===h})?h:'today'}
 function rewardName(r){ return r.name||t('Pokémon card pack'); }
 function catalog(){ return (S.catalog&&S.catalog.length)?S.catalog:DEFAULT_CATALOG; }
 
@@ -24,7 +24,7 @@ function render(){
     var pct=c.next?Math.round((c.xp-c.rank.xp)/(c.next.xp-c.rank.xp)*100):100;
     var owed=REWARDS.filter(function(r){return r.status==='earned'||r.status==='unpicked'}).length;
     h+='<div class="langs">'+['sk','de','en'].map(function(l){return '<button data-act="lang" data-v="'+l+'" class="'+(LANG===l?'on':'')+'">'+l.toUpperCase()+'</button>'}).join('')+'</div>';
-    h+='<header class="hero"><div class="avatar">'+pc(c.rank.p)+'</div><div class="hinfo"><div class="pname">'+esc(S.player)+'</div>'+
+    h+='<header class="hero"><div class="avatar">'+pc(c.rank.p)+'</div><div class="hinfo"><a class="pname" href="#users" title="'+esc(t('Players'))+'">'+esc(S.player)+((USERS&&USERS.length>1)?' <span class="sw">⇄</span>':'')+'</a>'+
        '<div class="rank">'+t(c.rank.n)+' · '+c.xp.toLocaleString(LOCALES[LANG])+' XP</div><div class="bar"><i style="width:'+pct+'%"></i></div>'+
        '<div class="small">'+(c.next?t('{n} XP to {r}',{n:(c.next.xp-c.xp).toLocaleString(LOCALES[LANG]),r:t(c.next.n)}):t('Top rank reached!'))+'</div></div>'+
        '<div class="hstats"><div class="streak"><b>🔥 '+c.cur+'</b><span>'+t('streak')+'</span></div>'+(owed?'<a class="streak gift" href="#prizes"><b>🎁 '+owed+'</b><span>'+t('prizes')+'</span></a>':'')+'</div></header>';
@@ -32,7 +32,7 @@ function render(){
     if(Store.mode==='device'&&S.sessions.length>=5&&(!S.lastBackup||Date.now()-S.lastBackup>14*86400000)) h+='<a class="banner" style="display:block;color:inherit;text-decoration:none" href="#history">💾 '+t('It’s been a while since the last backup. Save one in the Log tab.')+'</a>';
     if(Store.mode==='readonly') h+='<div class="banner">'+t('View only — you can see progress, but only the owner can log sessions.')+'</div>';
     if(Store.mode==='live'&&Store.slow) h+='<div class="banner">'+t('Can’t reach saved progress yet — what you see may be out of date.')+'</div>';
-    h+= tb==='today'?vToday(c): tb==='week'?vWeek(c): tb==='woodpecker'?vWood(c): tb==='prizes'?vPrizes(c): vHistory(c);
+    h+= tb==='today'?vToday(c): tb==='week'?vWeek(c): tb==='woodpecker'?vWood(c): tb==='prizes'?vPrizes(c): tb==='users'?vUsers(): vHistory(c);
     h+='<div class="credits">'+t('Board & pieces')+': <a href="https://github.com/lichess-org/chessground" target="_blank" rel="noopener">Lichess chessground</a> (GPLv3), Cburnett (CC BY-SA 3.0) · '+t('Sounds')+': Lichess SFX, Enigmahack (AGPLv3+) · '+t('Puzzles')+': <a href="https://database.lichess.org/" target="_blank" rel="noopener">Lichess</a> (CC0) · Stockfish 17.1 (GPLv3) · chess.js</div>';
   }
   h+='</div><nav><div class="in">'+TABS.map(function(x){return '<a href="#'+x[0]+'" class="'+(x[0]===tb?'on':'')+'"><span class="g">'+x[1]+'</span>'+t(x[2])+'</a>'}).join('')+'</div></nav>';
@@ -222,6 +222,7 @@ function vHistory(c){
   });
   h+='</div>';
   if(Store.mode!=='readonly'){
+    h+='<a class="card plink" href="#users"><span class="pi">👥</span><span><b>'+t('Players')+'</b><br><span class="sub">'+t('Switch, add or delete players')+' · '+t('Now playing: {n}',{n:esc(S.player)})+'</span></span><span class="go">›</span></a>';
     h+='<div class="card"><h2>⚙️ '+t('Settings')+'</h2><form id="settings"><div class="grid2"><label class="fld">'+t('Player name')+'<input name="player" maxlength="30" value="'+esc(S.player)+'"></label>'+
       '<label class="fld">'+t('Endgame Stockfish level (0–20)')+'<input name="skill" type="number" min="0" max="20" value="'+S.skill+'"></label></div>'+
       '<label class="fld">'+t('Language')+'<select name="lang">'+[['sk','Slovenčina'],['de','Deutsch'],['en','English']].map(function(o){return '<option value="'+o[0]+'"'+(LANG===o[0]?' selected':'')+'>'+o[1]+'</option>'}).join('')+'</select></label>'+
@@ -236,6 +237,41 @@ function vHistory(c){
     h+='<div class="card danger"><h2>🗑 '+t('Delete all data')+'</h2><p class="sub">'+t('Removes all sessions, puzzle progress, prizes, badges progress and game notebooks. This cannot be undone.')+'</p><button class="btn warn" data-act="reset1">'+t('Delete all data…')+'</button></div>';
   }
   return h;
+}
+
+/* ---------- players page ---------- */
+function vUsers(){
+  var list=USERS||[], ro=Store.mode==='readonly';
+  var h='<div class="lhead"><a class="back" href="#history" aria-label="'+t('Back')+'" style="display:grid;place-items:center;text-decoration:none;color:inherit">←</a><h2>👥 '+t('Players')+'</h2></div>';
+  h+='<div class="card"><p class="sub">'+t('Each player has their own sessions, puzzle progress, prizes and notebooks. The chosen player is remembered on this device.')+'</p><div class="list">';
+  if(!USERS) h+='<p class="sub"><span class="spin"></span> '+t('Loading…')+'</p>';
+  list.forEach(function(u){
+    var me=u.id===UID, nm=Store.userName(u);
+    h+='<div class="urow'+(me?' me':'')+'"><div class="uav">'+esc((nm||'?').trim().charAt(0).toUpperCase())+'</div><div class="um"><b>'+esc(nm)+'</b>'+(me?'<span class="tag">'+t('Playing now')+'</span>':'')+'</div>'+
+       (me?'':'<button class="btn sm" data-act="uswitch" data-id="'+esc(u.id)+'">'+t('Switch')+'</button>')+
+       (!ro&&list.length>1?'<button class="btn ghost sm" data-act="udel" data-id="'+esc(u.id)+'" aria-label="'+t('Delete player')+'">🗑</button>':'')+'</div>';
+  });
+  h+='</div>';
+  if(!ro) h+='<form id="adduser" class="addprize"><input name="name" maxlength="30" placeholder="'+t('New player name')+'" required><button class="btn sm" type="submit">＋ '+t('Add player')+'</button></form>';
+  h+='</div>';
+  return h;
+}
+function userDelOverlay(id,step){
+  return function(){
+    var u=(USERS||[]).filter(function(x){return x.id===id})[0]; if(!u) return '';
+    var nm='<b>'+esc(Store.userName(u))+'</b>';
+    if(step===1) return '<div class="overlay"><div class="card"><h2>⚠️ '+t('Delete player {n}?',{n:nm})+'</h2><p>'+t('All sessions, puzzle progress, prizes and notebooks of {n} will be deleted for good.',{n:nm})+'</p><div class="btns"><button class="btn ghost" data-act="closeov">'+t('Cancel')+'</button><button class="btn warn" data-act="udel2" data-id="'+esc(id)+'">'+t('Continue')+'</button></div></div></div>';
+    var word=t('DELETE');
+    return '<div class="overlay"><div class="card"><h2>🗑 '+t('Are you really sure?')+'</h2><p>'+t('Type {w} to confirm.',{w:'<b>'+word+'</b>'})+'</p><input id="resetword" class="bigin" autocomplete="off" autocapitalize="characters" value="'+esc(resetWord)+'"><div class="btns"><button class="btn ghost" data-act="closeov">'+t('Cancel')+'</button><button class="btn warn" id="resetgo" data-act="udelgo" data-id="'+esc(id)+'"'+(wordOk(resetWord)?'':' disabled')+'>'+t('Delete player')+'</button></div></div></div>';
+  };
+}
+function doDeleteUser(id){
+  overlay=null; resetWord='';
+  var wasMe=id===UID;
+  Store.deleteUser(id).then(function(){
+    toast(t('Player deleted'));
+    if(wasMe) Store.switchUser(USERS[0].id); else render();
+  });
 }
 
 /* ---------- overlays ---------- */
@@ -396,6 +432,10 @@ document.addEventListener('click',function(e){
   else if(act==='coord'){ openLesson('thu','coord'); }
   else if(act==='resume'){ location.hash='lesson'; }
   else if(act==='leave'){ location.hash='today'; }
+  else if(act==='uswitch'){ Store.switchUser(id); }
+  else if(act==='udel'){ resetWord=''; showOverlay(userDelOverlay(id,1)); }
+  else if(act==='udel2'){ showOverlay(userDelOverlay(id,2)); }
+  else if(act==='udelgo'){ if(wordOk(resetWord)) doDeleteUser(id); }
   else if(act==='pause'||act==='unpause'){ if(!L) return; L.paused=act==='pause'; var pb=document.getElementById('pausebox'), ls=document.getElementById('lesson'); if(pb) pb.hidden=!L.paused; if(ls) ls.hidden=L.paused; driveClock(); if(!L.paused) lr(); }
   else if(act==='end'){ if(!L) return; L.paused=false; var done=L.finish&&L.finish(); if(!done){ if(L.saved&&L.saved()) toast(t('Game saved — continue any time.')); location.hash='today'; } }
   else if(act==='clearpend'){ e.preventDefault(); clearPend(draft.slot); render(); }
@@ -417,7 +457,7 @@ document.addEventListener('click',function(e){
   else if(act==='copybk'){ var ta=document.getElementById('bktext'); try{ navigator.clipboard.writeText(ta.value).then(function(){ toast('✓ '+t('Copied')); },function(){ ta.select(); }); }catch(e2){ ta.select(); } }
   else if(act==='import'){ importText=''; importData=null; showOverlay(importOverlay(1)); }
   else if(act==='import2'){ var d=parseBackup(importText); if(!d){ toast(t('That is not a Daily Gambit backup')); return; } importData=d; showOverlay(importOverlay(2)); }
-  else if(act==='import3'){ var dd=importData; overlay=null; Store.importAll(dd).then(function(){ PEND={}; lsSet('ctq2_pend',null); L=null; importData=null; importText=''; toast('✓ '+t('Backup restored')); location.hash='today'; render(); }).catch(function(){ toast(t('Could not restore the backup')); render(); }); }
+  else if(act==='import3'){ var dd=importData; overlay=null; Store.importAll(dd).then(function(){ PEND={}; lsSet(K('pend'),null); L=null; importData=null; importText=''; toast('✓ '+t('Backup restored')); location.hash='today'; render(); }).catch(function(){ toast(t('Could not restore the backup')); render(); }); }
 });
 document.addEventListener('toggle',function(e){ if(e.target.getAttribute&&e.target.getAttribute('data-act')==='openlog'){ draft.open=e.target.open; if(e.target.open) updateLive(); } },true);
 document.addEventListener('submit',function(e){
@@ -428,7 +468,10 @@ document.addEventListener('submit',function(e){
     if(s.wp && s.wp.ok>s.wp.n){ toast(t('Correct can’t be more than puzzles solved')); return; }
     commitSession(s);
   } else if(f.id==='settings'){
-    S.player=(f.elements.player.value||'Champion').trim().slice(0,30); S.skill=Math.max(0,Math.min(20,+f.elements.skill.value||10)); S.sound=f.elements.sound.checked; S.lang=f.elements.lang.value; setLang(S.lang); Store.saveSettings(); toast(t('Settings saved')); render();
+    S.player=(f.elements.player.value||'Champion').trim().slice(0,30); S.skill=Math.max(0,Math.min(20,+f.elements.skill.value||10)); S.sound=f.elements.sound.checked; S.lang=f.elements.lang.value; setLang(S.lang); Store.saveSettings(); Store.syncName(); toast(t('Settings saved')); render();
+  } else if(f.id==='adduser'){
+    var un=f.elements.name.value.trim().slice(0,30); if(!un) return;
+    Store.addUser(un).then(function(){ toast(t('Player added: {n}',{n:un})); render(); });
   } else if(f.id==='addprize'){
     var name=f.elements.name.value.trim(); if(!name) return;
     S.catalog=catalog().concat([{id:uid(),icon:(f.elements.icon.value.trim()||'🎁'),name:name}]); Store.saveSettings(); toast(t('Prize added')); render();
