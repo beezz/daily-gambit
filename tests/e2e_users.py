@@ -61,22 +61,35 @@ async def run(pg,label,live):
     check(len(await pg.query_selector_all('.hist'))==0, label+': Ema starts with an empty log')
     await log_rest_day(pg); await pg.goto(BASE+'#history'); await pg.wait_for_timeout(400)
     check(len(await pg.query_selector_all('.hist'))==1, label+': Ema has her own session')
+    # rename Ema in Settings; the list (and other players' view of it) must follow
+    await pg.fill('#settings input[name="player"]','Emka'); await pg.click('#settings button[type=submit]'); await pg.wait_for_timeout(500)
+    await pg.goto(BASE+'#users'); await pg.wait_for_timeout(400)
+    check('Emka' in await pg.inner_text('.urow.me'), label+': renamed player shown in list')
     # back to the first player: still only their one session
     await pg.goto(BASE+'#users'); await pg.wait_for_timeout(400)
     await pg.click('[data-act="uswitch"]'); await pg.wait_for_load_state('load'); await pg.wait_for_timeout(900)
     check((await pg.inner_text('.pname')).split(' ⇄')[0].strip()==name0.strip(), label+': back to first player')
+    await pg.goto(BASE+'#users'); await pg.wait_for_timeout(600)
+    names=[await r.inner_text() for r in await pg.query_selector_all('.urow .um b')]
+    check('Emka' in names and 'Ema' not in names, label+': other player shows her new name, not the old one %s'%names)
+    if live:
+        # a stale player list (old names) must not win over the players' own settings
+        await pg.evaluate("(()=>{const d=JSON.parse(sessionStorage.getItem('__mockdb'));d['meta/users'].list.forEach(u=>u.name='OLD');sessionStorage.setItem('__mockdb',JSON.stringify(d));})()")
+        await pg.reload(); await pg.wait_for_timeout(900); await pg.goto(BASE+'#users'); await pg.wait_for_timeout(600)
+        names=[await r.inner_text() for r in await pg.query_selector_all('.urow .um b')]
+        check('OLD' not in names and 'Emka' in names, label+': names come from each player, not the stale list %s'%names)
     await pg.goto(BASE+'#history'); await pg.wait_for_timeout(500)
     check(len(await pg.query_selector_all('.hist'))==1, label+': first player data untouched')
     # delete Ema (two confirmations)
     await pg.goto(BASE+'#users'); await pg.wait_for_timeout(400)
     rows=await pg.query_selector_all('.urow')
-    ema=[r for r in rows if 'Ema' in await r.inner_text()][0]
+    ema=[r for r in rows if 'Emka' in await r.inner_text()][0]
     await (await ema.query_selector('[data-act="udel"]')).click(); await pg.wait_for_timeout(200)
     check(await pg.is_visible('[data-act="udel2"]'), label+': first confirmation shown')
     await pg.click('[data-act="udel2"]'); await pg.wait_for_timeout(200)
     check(await pg.is_disabled('#resetgo'), label+': delete disabled until word typed')
     await pg.fill('#resetword','DELETE'); await pg.click('#resetgo'); await pg.wait_for_timeout(800)
-    check(len(await pg.query_selector_all('.urow'))==1, label+': Ema removed from list')
+    check(len(await pg.query_selector_all('.urow'))==1, label+': Emka removed from list')
     if live:
         keys=await pg.evaluate("Object.keys(window.__store)")
         left=[k for k in keys if k.startswith('u_')]

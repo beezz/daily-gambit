@@ -468,7 +468,7 @@ document.addEventListener('submit',function(e){
     if(s.wp && s.wp.ok>s.wp.n){ toast(t('Correct can’t be more than puzzles solved')); return; }
     commitSession(s);
   } else if(f.id==='settings'){
-    S.player=(f.elements.player.value||'Champion').trim().slice(0,30); S.skill=Math.max(0,Math.min(20,+f.elements.skill.value||10)); S.sound=f.elements.sound.checked; S.lang=f.elements.lang.value; setLang(S.lang); Store.saveSettings(); Store.syncName(); toast(t('Settings saved')); render();
+    S.player=(f.elements.player.value||'Champion').trim().slice(0,30); S.skill=Math.max(0,Math.min(20,+f.elements.skill.value||10)); S.sound=f.elements.sound.checked; S.lang=f.elements.lang.value; setLang(S.lang); Store.saveSettings(); toast(t('Settings saved')); render();
   } else if(f.id==='adduser'){
     var un=f.elements.name.value.trim().slice(0,30); if(!un) return;
     Store.addUser(un).then(function(){ toast(t('Player added: {n}',{n:un})); render(); });

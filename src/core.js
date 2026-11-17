@@ -70,7 +70,8 @@ function lsSet(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.
    Several players share one app. The active player is chosen per device (dg_user); switching
    reloads the page. Player 'main' keeps the original storage names, so existing progress stays put. */
 var UID=lsGet('dg_user')||'main';
-var USERS=null;                                   // [{id,name}] once loaded
+var USERS=null;                                   // [{id,name}] once loaded (name here is only a fallback)
+var NAMES={};                                     // live names, read from each player's own settings
 function K(n,u){ u=u||UID; return u==='main'?'ctq2_'+n:'ctq2u_'+u+'_'+n; }          // localStorage key
 function C(n,u){ u=u||UID; return u==='main'?n:'u_'+u+'_'+n; }                      // db collection
 function SDOC(u){ return C('progress',u)+'/settings'; }                               // db settings doc
@@ -242,7 +243,14 @@ var Store = {
   },
   loadUsers:function(){
     var fix=function(list){ list=(list||[]).filter(function(x){return x&&x.id}); if(!list.length) list=[{id:'main',name:''}]; if(!list.some(function(x){return x.id===UID})) list.push({id:UID,name:''}); USERS=list; return list; };
-    if(this.mode==='live') return this.db.doc('meta/users').get().then(function(s){ return fix(s.exists?(s.data()||{}).list:null); }).catch(function(){ return fix(null); });
+    var self=this;
+    if(this.mode==='live') return new Promise(function(res){
+      var first=true;
+      self.db.doc('meta/users').onSnapshot(function(snap){
+        fix(snap.exists?(snap.data()||{}).list:null); self.watchNames();
+        if(first){ first=false; res(USERS); } else if(!inLesson()) render();
+      }, function(){ fix(USERS); if(first){ first=false; res(USERS); } });
+    });
     return Promise.resolve(fix(lsGet('dg_users')));
   },
   saveUsers:function(){
@@ -251,8 +259,22 @@ var Store = {
     if(this.mode!=='live') return Promise.resolve();
     var self=this; return this.q(function(){ return self.db.doc('meta/users').set({list:list}); });
   },
-  userName:function(u){ return (u.id===UID?S.player:u.name)||u.name||t('Player'); },
-  syncName:function(){ if(!USERS) return; var me=USERS.filter(function(x){return x.id===UID})[0]; if(me&&me.name!==S.player){ me.name=S.player; this.saveUsers(); } },
+  /* A player's name lives in their own settings; the list only keeps ids (+ a fallback name). */
+  watched:{},
+  watchNames:function(){
+    var self=this; if(this.mode!=='live') return;
+    (USERS||[]).forEach(function(u){
+      if(u.id===UID||self.watched[u.id]) return; self.watched[u.id]=true;
+      self.db.doc(SDOC(u.id)).onSnapshot(function(snap){
+        var d=snap.exists?snap.data():null; if(d&&d.player&&NAMES[u.id]!==d.player){ NAMES[u.id]=d.player; if(!inLesson()) render(); }
+      }, function(){});
+    });
+  },
+  userName:function(u){
+    if(u.id===UID) return S.player||u.name||t('Player');
+    if(this.isLocal()){ var st=lsGet(K('state',u.id)); if(st&&st.player) return st.player; }
+    return NAMES[u.id]||u.name||t('Player');
+  },
   addUser:function(name){
     var u={id:uid(),name:name}; USERS=(USERS||[]).concat([u]);
     var st=clone(DEFAULT_STATE); st.player=name; st.lang=S.lang; st.sound=S.sound; st.skill=S.skill; st.catalog=clone(S.catalog||DEFAULT_CATALOG);
