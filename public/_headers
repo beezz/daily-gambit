@@ -1,4 +1,5 @@
-# Cloudflare Pages response headers (not part of the offline cache)
+# Cloudflare response headers (not part of the offline cache).
+# .wasm already gets Content-Type: application/wasm from Cloudflare; adding it here duplicated the header.
 /sw.js
   Cache-Control: no-cache
 
@@ -7,9 +8,3 @@
 
 /index.html
   Cache-Control: no-cache
-
-/*.wasm
-  Content-Type: application/wasm
-
-/engine/stockfish-17.1-lite-single-03e3232.wasm
-  Content-Type: application/wasm

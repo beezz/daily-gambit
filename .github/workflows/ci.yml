@@ -35,6 +35,6 @@ jobs:
 
       - name: Smoke test (lessons, Stockfish, offline)
         run: |
-          (cd dist && python3 -m http.server 8765 >/dev/null 2>&1 &)
+          (python3 tests/cf_like_server.py 8765 >/dev/null 2>&1 &)
           sleep 2
           python3 tests/smoke.py
