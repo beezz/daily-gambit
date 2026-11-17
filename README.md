@@ -41,18 +41,20 @@ Icons are generated from the otter mascot with `python3 tools/make_icons.py`. `p
 
 ```
 src/            app source — i18n.js, core.js (data, scoring, storage, board, engine),
-                lessons.js (all six lessons), ui.js (screens), index.html, pieces-sprite.svg,
+                lessons.js (all six lessons), openings.js (Openings tab), ui.js (screens), index.html, pieces-sprite.svg,
                 pwa.js (install + update pills), sw.js (service-worker template)
 public/         static files copied as-is: libraries, Stockfish, puzzle/game data, sounds, css,
                 fonts, icons, manifest, Cloudflare _headers
-tools/          scripts that generated the data and checked the endgame positions
+tools/          scripts that generated the data and checked the endgame positions;
+                openings_src.py is the opening repertoire, build_openings.py builds and
+                Stockfish-checks it (python3 tools/build_openings.py <chess-openings dir> --check)
 tests/          end-to-end browser tests (Playwright + Chrome)
 build.py        joins src/ + public/ into dist/ and generates dist/sw.js
 ```
 
 ## Privacy
 
-This repository contains **no personal data and no secrets**: no player names, no progress, no keys or tokens. Progress is stored on the device or in the app's own storage, never in the code. Please keep it that way in any contribution: no real names, photos, exported progress files or credentials.
+This repository contains **no personal data and no secrets**: no player names, no progress, no keys or tokens. The optional Lichess token for opening statistics is kept only in the browser of the device where it was entered (not in backups, not in shared storage). Progress is stored on the device or in the app's own storage, never in the code. Please keep it that way in any contribution: no real names, photos, exported progress files or credentials.
 
 ## Licence
 

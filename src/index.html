@@ -135,11 +135,23 @@ cg-board square.target{background:rgba(92,61,36,.55)}
 .lhead h2{font-size:20px;flex:1}
 .back{border:0;background:#fff;border:1px solid var(--line);border-radius:12px;width:42px;height:42px;font-size:20px;cursor:pointer;flex:none}
 [hidden]{display:none!important}
+.ophead{display:flex;gap:12px;align-items:center}.ophead h2{margin:0}.opic{font-size:34px;line-height:1}
+.oprep .bar{margin:10px 0}.oprep .btns{display:flex;flex-wrap:wrap;gap:8px}.oprep .btns .btn{flex:1 1 auto}
+.due{display:inline-block;min-width:22px;padding:0 6px;border-radius:11px;background:#e2564d;color:#fff;font-size:13px;margin-left:4px}
+.oplines{margin-top:10px}.oplines summary{cursor:pointer;font-weight:700;padding:6px 0}
+.opline{display:flex;gap:10px;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin:6px 0;cursor:pointer;font:inherit;color:inherit}
+.opline small{color:var(--muted,#8a7563)}
+.opnext h3,.opstats h3{margin:0 0 6px;font-size:16px}
+.opmove{display:flex;gap:10px;align-items:baseline;width:100%;text-align:left;background:#fff;border:2px solid var(--line);border-radius:12px;padding:8px 10px;margin:5px 0;cursor:pointer;font:inherit;color:inherit}
+.opmove.ours{border-color:#7fb069;background:#f1f8ec}.opmove b{min-width:52px}.opmove span{font-size:13px;color:var(--muted,#8a7563)}
+.strow{display:grid;grid-template-columns:70px 44px 1fr 64px;gap:8px;align-items:center;width:100%;background:none;border:0;border-bottom:1px solid var(--line);padding:6px 2px;cursor:pointer;font:inherit;color:inherit;text-align:left}
+.strow.rep{background:#f1f8ec}.strow small{text-align:right;color:var(--muted,#8a7563)}
+.wdl{display:flex;height:12px;border-radius:6px;overflow:hidden;border:1px solid #bbb}.wdl i{display:block}.wdl .w{background:#fff}.wdl .d{background:#a0a0a0}.wdl .b{background:#333;flex:1}
 /* lessons on tablets / landscape phones: board on the left, text and buttons beside it */
 @media (min-width:600px) and (orientation:landscape){
   body.inlesson .wrap{max-width:1180px}
   .lsplit{display:grid;grid-template-columns:auto minmax(240px,1fr);grid-template-areas:"board pre" "board side";grid-template-rows:auto 1fr;column-gap:20px;align-items:start}
-  .lpre{grid-area:pre;min-width:0}.lside{grid-area:side;min-width:0}
+  .lpre{grid-area:pre;min-width:0}.lside{grid-area:side;min-width:0;max-height:calc(100dvh - 215px);overflow:auto;overscroll-behavior:contain;padding-bottom:4px}
   .lboard{grid-area:board;position:sticky;top:8px}
   .lboard .cgbox{width:min(calc(100dvh - 176px),calc(100vw - 340px),760px);max-width:none;min-width:190px;margin:0}
   .lside>.msg:first-child,.lpre>:first-child{margin-top:0}

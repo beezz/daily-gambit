@@ -1,7 +1,7 @@
 /* Daily Gambit — screens, log form, rewards, settings, events */
 
 var draft={slot:SLOTS[slotIdxOf(new Date())].k}, pendingDel=null, pendingCycle=false, overlay=null, pendingGive=null, resetWord='';
-var TABS=[['today','♟','Today'],['week','📅','Week'],['woodpecker','🐦','Puzzles'],['prizes','🎁','Prizes'],['history','📜','Log']];
+var TABS=[['today','♟','Today'],['week','📅','Week'],['woodpecker','🐦','Puzzles'],['openings','📖','Openings'],['prizes','🎁','Prizes'],['history','📜','Log']];
 var MASCOT='<svg viewBox="0 0 120 120" aria-hidden="true"><ellipse cx="60" cy="113" rx="34" ry="5" fill="#000" opacity=".08"/><path d="M86 100 q26 4 24 -22 q-2 -10 -8 -8 q4 14 -18 18 Z" fill="#7a5233"/><ellipse cx="60" cy="88" rx="31" ry="25" fill="#8b5e3c"/><ellipse cx="60" cy="92" rx="20" ry="19" fill="#f0d9b5"/><circle cx="35" cy="28" r="8" fill="#8b5e3c"/><circle cx="35" cy="28" r="4" fill="#5c3d24"/><circle cx="85" cy="28" r="8" fill="#8b5e3c"/><circle cx="85" cy="28" r="4" fill="#5c3d24"/><circle cx="60" cy="48" r="29" fill="#a0714b"/><ellipse cx="60" cy="60" rx="21" ry="15" fill="#f0d9b5"/><circle cx="47" cy="44" r="5.5" fill="#3b2a1d"/><circle cx="73" cy="44" r="5.5" fill="#3b2a1d"/><circle cx="48.8" cy="42.2" r="1.9" fill="#fff"/><circle cx="74.8" cy="42.2" r="1.9" fill="#fff"/><circle cx="39" cy="56" r="4.5" fill="#e8a08a" opacity=".55"/><circle cx="81" cy="56" r="4.5" fill="#e8a08a" opacity=".55"/><ellipse cx="60" cy="54" rx="6.5" ry="4.5" fill="#3b2a1d"/><ellipse cx="58" cy="52.8" rx="2" ry="1.1" fill="#fff" opacity=".6"/><path d="M54 61 q3 4 6 0 q3 4 6 0" stroke="#3b2a1d" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M45 58 L31 55 M45 61 L31 63 M75 58 L89 55 M75 61 L89 63" stroke="#5c3d24" stroke-width="1.6" stroke-linecap="round" opacity=".7"/><g transform="translate(60 92)"><circle cx="0" cy="-12" r="5.5" fill="#fff" stroke="#5c3d24" stroke-width="1.8"/><path d="M-4 -6 h8 l3 12 h-14 Z" fill="#fff" stroke="#5c3d24" stroke-width="1.8" stroke-linejoin="round"/><rect x="-9" y="5" width="18" height="5" rx="2" fill="#fff" stroke="#5c3d24" stroke-width="1.8"/></g><ellipse cx="46" cy="90" rx="8" ry="6" fill="#7a5233"/><ellipse cx="74" cy="90" rx="8" ry="6" fill="#7a5233"/><ellipse cx="46" cy="108" rx="9" ry="5" fill="#7a5233"/><ellipse cx="74" cy="108" rx="9" ry="5" fill="#7a5233"/></svg>';
 function tab(){var h=(location.hash||'').slice(1); if(h==='lesson') return L?'lesson':'today'; if(h==='users') return 'users'; return TABS.some(function(x){return x[0]===h})?h:'today'}
 function rewardName(r){ return r.name||t('Pokémon card pack'); }
@@ -32,7 +32,7 @@ function render(){
     if(Store.mode==='device'&&S.sessions.length>=5&&(!S.lastBackup||Date.now()-S.lastBackup>14*86400000)) h+='<a class="banner" style="display:block;color:inherit;text-decoration:none" href="#history">💾 '+t('It’s been a while since the last backup. Save one in the Log tab.')+'</a>';
     if(Store.mode==='readonly') h+='<div class="banner">'+t('View only — you can see progress, but only the owner can log sessions.')+'</div>';
     if(Store.mode==='live'&&Store.slow) h+='<div class="banner">'+t('Can’t reach saved progress yet — what you see may be out of date.')+'</div>';
-    h+= tb==='today'?vToday(c): tb==='week'?vWeek(c): tb==='woodpecker'?vWood(c): tb==='prizes'?vPrizes(c): tb==='users'?vUsers(): vHistory(c);
+    h+= tb==='today'?vToday(c): tb==='week'?vWeek(c): tb==='woodpecker'?vWood(c): tb==='prizes'?vPrizes(c): tb==='users'?vUsers(): tb==='openings'?vOpenings(): vHistory(c);
     h+='<div class="credits">'+t('Board & pieces')+': <a href="https://github.com/lichess-org/chessground" target="_blank" rel="noopener">Lichess chessground</a> (GPLv3), Cburnett (CC BY-SA 3.0) · '+t('Sounds')+': Lichess SFX, Enigmahack (AGPLv3+) · '+t('Puzzles')+': <a href="https://database.lichess.org/" target="_blank" rel="noopener">Lichess</a> (CC0) · Stockfish 17.1 (GPLv3) · chess.js</div>';
   }
   h+='</div><nav><div class="in">'+TABS.map(function(x){return '<a href="#'+x[0]+'" class="'+(x[0]===tb?'on':'')+'"><span class="g">'+x[1]+'</span>'+t(x[2])+'</a>'}).join('')+'</div></nav>';
@@ -432,13 +432,16 @@ document.addEventListener('click',function(e){
   else if(act==='lesson'){ openLesson(draft.slot); }
   else if(act==='coord'){ openLesson('thu','coord'); }
   else if(act==='resume'){ location.hash='lesson'; }
-  else if(act==='leave'){ location.hash='today'; }
+  else if(act==='leave'){ location.hash=(L&&L.home)||'today'; }
   else if(act==='uswitch'){ Store.switchUser(id); }
+  else if(act==='oplearn'||act==='opdrill'||act==='opexplore'){ var li=tg.getAttribute('data-i'); openOpening(act==='oplearn'?'learn':act==='opdrill'?'drill':'explore',id,li==null?null:+li); }
+  else if(act==='lidel'){ lsSet('dg_lichess_token',null); LI.cache={}; toast(t('Token removed from this device')); render(); }
+  else if(act==='litest'){ LI.cache={}; liStats('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1').then(function(d){ toast(d.err?liErr(d.err):'✓ '+t('Lichess works! {n} master games in the database.',{n:((d.white||0)+(d.draws||0)+(d.black||0)).toLocaleString(LOCALES[LANG])})); }); }
   else if(act==='udel'){ resetWord=''; showOverlay(userDelOverlay(id,1)); }
   else if(act==='udel2'){ showOverlay(userDelOverlay(id,2)); }
   else if(act==='udelgo'){ if(wordOk(resetWord)) doDeleteUser(id); }
   else if(act==='pause'||act==='unpause'){ if(!L) return; L.paused=act==='pause'; var pb=document.getElementById('pausebox'), ls=document.getElementById('lesson'); if(pb) pb.hidden=!L.paused; if(ls) ls.hidden=L.paused; driveClock(); if(!L.paused) lr(); }
-  else if(act==='end'){ if(!L) return; L.paused=false; var done=L.finish&&L.finish(); if(!done){ if(L.saved&&L.saved()) toast(t('Game saved — continue any time.')); location.hash='today'; } }
+  else if(act==='end'){ if(!L) return; L.paused=false; var done=L.finish&&L.finish(); if(!done){ if(L.saved&&L.saved()) toast(t('Game saved — continue any time.')); location.hash=L.home||'today'; } }
   else if(act==='clearpend'){ e.preventDefault(); clearPend(draft.slot); render(); }
   else if(act==='excuse'){ var s=readDraft(); commitSession({id:s.id,date:s.date,slot:s.slot,min:0,parts:[],excused:true,note:s.note}); }
   else if(act==='del'){ if(pendingDel===id){ S.sessions=S.sessions.filter(function(x){return x.id!==id}); pendingDel=null; Store.delSession(id); toast(t('Session deleted')); render(); } else { pendingDel=id; render(); } }
@@ -470,6 +473,10 @@ document.addEventListener('submit',function(e){
     commitSession(s);
   } else if(f.id==='settings'){
     S.player=(f.elements.player.value||'Champion').trim().slice(0,30); S.skill=Math.max(0,Math.min(20,+f.elements.skill.value||10)); S.sound=f.elements.sound.checked; S.lang=f.elements.lang.value; setLang(S.lang); Store.saveSettings(); toast(t('Settings saved')); render();
+  } else if(f.id==='litoken'){
+    var tk=f.elements.tok.value.trim(); if(!tk) return;
+    lsSet('dg_lichess_token',tk); LI.cache={};
+    liStats('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1').then(function(d){ if(d.err==='auth'){ lsSet('dg_lichess_token',null); toast(liErr(d.err)); } else toast(d.err?t('Token saved.')+' '+liErr(d.err):'✓ '+t('Connected to Lichess!')); render(); });
   } else if(f.id==='adduser'){
     var un=f.elements.name.value.trim().slice(0,30); if(!un) return;
     Store.addUser(un).then(function(){ toast(t('Player added: {n}',{n:un})); render(); });
@@ -488,7 +495,7 @@ document.addEventListener('change',function(e){
   if(e.target.closest('#logform')) updateLive();
   var l=e.target.getAttribute&&e.target.getAttribute('data-l'); if(l&&L&&L.change&&inLesson()){ L.change(l,e.target); }
 });
-window.addEventListener('hashchange',function(){ driveClock(); pendingDel=null; pendingCycle=false; pendingGive=null; render(); window.scrollTo(0,0); });
+window.addEventListener('hashchange',function(){ opLeft(); driveClock(); pendingDel=null; pendingCycle=false; pendingGive=null; render(); window.scrollTo(0,0); });
 setInterval(function(){ driveClock(); if(inLesson()&&L.tick) L.tick(); },500);
 document.addEventListener('visibilitychange',driveClock);
 document.addEventListener('keydown',function(e){
