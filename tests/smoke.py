@@ -1,7 +1,7 @@
 """Smoke test: every lesson opens without errors, Stockfish starts, and the app works offline.
 
 Run from the repo root:
-  python3 build.py && (cd dist && python3 -m http.server 8765 &)
+  python3 build.py && (python3 tests/cf_like_server.py 8765 &)
   pip install playwright && playwright install chromium   # or set CHROME=/path/to/chrome
   python3 tests/smoke.py
 
@@ -79,6 +79,10 @@ async def main():
                 for(let i=0;i<120;i++){ const ks=await caches.keys(); if(ks.length){ const c=await caches.open(ks[ks.length-1]); const n=(await c.keys()).length; if(n>20) return n; } await new Promise(r=>setTimeout(r,500)); }
                 return false; }""")
             check(bool(ready), f'Service worker installed and cached {ready} files')
+            for i in range(2):  # normal reloads go through the service worker (regression: redirected index.html)
+                await pg.reload()
+                await pg.wait_for_selector('.hero', timeout=15000)
+            check(True, 'Normal reloads through the service worker work')
             await ctx.set_offline(True)
             await pg.reload()
             await pg.wait_for_selector('.hero', timeout=15000)
