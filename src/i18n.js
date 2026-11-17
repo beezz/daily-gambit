@@ -33,7 +33,8 @@ var DICT={
 /* navigation & general */
 'Today':['Dnes','Heute'],'Week':['Týždeň','Woche'],'Puzzles':['Úlohy','Aufgaben'],'Prizes':['Odmeny','Preise'],'Log':['Záznam','Protokoll'],
 'Mon':['Po','Mo'],'Tue':['Ut','Di'],'Wed':['St','Mi'],'Thu':['Št','Do'],'Fri':['Pi','Fr'],'Wknd':['Víkend','WE'],
-'Back':['Späť','Zurück'],'Players':['Hráči','Spieler'],'Player':['Hráč','Spieler'],'Switch':['Prepnúť','Wechseln'],'Playing now':['Práve hrá','Spielt gerade'],
+'Back':['Späť','Zurück'],'First move':['Prvý ťah','Erster Zug'],'Previous move':['Predchádzajúci ťah','Vorheriger Zug'],'Next move':['Ďalší ťah','Nächster Zug'],'Back to the game':['Späť do partie','Zurück zur Partie'],
+'Looking at move {n}. The game waits for you.':['Pozeráš ťah {n} Partia na teba počká.','Du schaust dir Zug {n} an. Die Partie wartet auf dich.'],'Players':['Hráči','Spieler'],'Player':['Hráč','Spieler'],'Switch':['Prepnúť','Wechseln'],'Playing now':['Práve hrá','Spielt gerade'],
 'Switch, add or delete players':['Prepni, pridaj alebo zmaž hráčov','Spieler wechseln, hinzufügen oder löschen'],'Now playing: {n}':['Teraz hrá: {n}','Jetzt spielt: {n}'],
 'Each player has their own sessions, puzzle progress, prizes and notebooks. The chosen player is remembered on this device.':['Každý hráč má vlastné tréningy, postup v úlohách, odmeny a zápisníky. Vybraný hráč sa pamätá na tomto zariadení.','Jeder Spieler hat eigene Einheiten, Aufgabenfortschritt, Preise und Notizbücher. Der gewählte Spieler wird auf diesem Gerät gemerkt.'],
 'New player name':['Meno nového hráča','Name des neuen Spielers'],'Add player':['Pridať hráča','Spieler hinzufügen'],'Delete player':['Zmazať hráča','Spieler löschen'],

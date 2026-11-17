@@ -491,6 +491,11 @@ document.addEventListener('change',function(e){
 window.addEventListener('hashchange',function(){ driveClock(); pendingDel=null; pendingCycle=false; pendingGive=null; render(); window.scrollTo(0,0); });
 setInterval(function(){ driveClock(); if(inLesson()&&L.tick) L.tick(); },500);
 document.addEventListener('visibilitychange',driveClock);
+document.addEventListener('keydown',function(e){
+  if(!inLesson()||!L||!L.key||L.paused||overlay) return;
+  var tg=e.target&&e.target.tagName; if(tg==='INPUT'||tg==='TEXTAREA'||tg==='SELECT'||e.altKey||e.ctrlKey||e.metaKey) return;
+  if(L.key(e.key)) e.preventDefault();
+});
 
 /* ---------- boot ---------- */
 setLang(S.lang);
