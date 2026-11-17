@@ -39,6 +39,7 @@ function render(){
   if(overlay) h+=overlay();
   if(typeof freeBoards==='function') freeBoards(false);
   root.innerHTML=h;
+  document.body.classList.toggle('inlesson',tb==='lesson');
   if(tb==='lesson') lr();
   if(tb==='today') updateLive();
 }

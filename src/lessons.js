@@ -17,7 +17,22 @@ function setL(x){ L=x; }
 function freeBoards(all){ Object.keys(BOARDS).forEach(function(k){ var b=BOARDS[k]; if(!b.cg) return; if(all){ try{ b.cg.destroy(); }catch(e){} delete BOARDS[k]; } else b.cg.setAutoShapes([]); }); }
 function switchLesson(slot,kind){ freeBoards(true); if(L&&L.clock) L.clock.halt(); var x={coord:CoordLesson,wood:WoodLesson}[kind](slot); L=newLessonObj(x,kind); render(); driveClock(); }
 function inLesson(){ return location.hash==='#lesson' && !!L; }
-function lr(){ var c=document.getElementById('lesson'); if(!c||!L) return; freeBoards(false); c.innerHTML=L.view(); if(L.mount) L.mount(c); driveClock(); }
+function lr(){ var c=document.getElementById('lesson'); if(!c||!L) return; freeBoards(false); c.innerHTML=L.view(); if(L.mount) L.mount(c); splitLayout(c); driveClock(); }
+/* Group the lesson around its board: what came before it, the board, and what follows.
+   CSS stacks the three on phones and puts the text and buttons beside the board on wider screens. */
+function splitLayout(c){
+  var box=c.querySelector('.cgbox'); if(!box) return;
+  var host=box; while(host.parentNode&&host.parentNode!==c) host=host.parentNode;
+  if(host.parentNode!==c) return;
+  var kids=[].slice.call(c.childNodes), i=kids.indexOf(host);
+  var wrap=document.createElement('div'); wrap.className='lsplit';
+  var pre=document.createElement('div'); pre.className='lpre';
+  var bd=document.createElement('div'); bd.className='lboard';
+  var side=document.createElement('div'); side.className='lside';
+  kids.forEach(function(n,j){ (j<i?pre:j===i?bd:side).appendChild(n); });
+  if(pre.childNodes.length) wrap.appendChild(pre);
+  wrap.appendChild(bd); wrap.appendChild(side); c.appendChild(wrap);
+}
 function openLesson(slot,kind){
   freeBoards(true);
   var make={wood:WoodLesson,coord:CoordLesson,endgame:EndgameLesson,guess:GuessLesson,friday:FridayLesson,weekend:WeekendLesson}[kind||SL[slot].lesson];
