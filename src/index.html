@@ -169,7 +169,7 @@ cg-board square.target{background:rgba(92,61,36,.55)}
 .mlist{max-height:180px;overflow:auto;font-size:14px;line-height:1.9;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-top:10px}
 .mlist span{cursor:pointer;padding:2px 4px;border-radius:6px}
 .mlist span.cur{background:var(--light)}
-.mnav{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0}.mnav .btn{font-size:18px;padding:6px 0}.mnav .btn:disabled{opacity:.35}
+.mnav{display:grid;grid-template-columns:1fr 1fr minmax(0,1.6fr) 1fr 1fr;gap:6px;margin:8px 0;align-items:stretch}.mpos{display:flex;align-items:center;justify-content:center;min-width:0;padding:0 6px;border-radius:12px;font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted,#8a7563);border:2px solid transparent}.mpos.on{background:#e8f0fb;border-color:#9bb8e0;color:#2c4f7c}.mnav .btn{border-width:2px!important}.mnav .btn.hot{background:#e8f0fb;border-color:#9bb8e0;color:#2c4f7c}.mnav .btn{font-size:18px;padding:6px 0}.mnav .btn:disabled{opacity:.35}
 .mlist span.tag{color:var(--red);font-weight:800}
 .mlist span.nt{text-decoration:underline dotted}
 .clocks{display:flex;gap:8px;margin:8px 0}

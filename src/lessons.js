@@ -483,12 +483,15 @@ function GuessLesson(slot){
     for(var i=0;i<h.length;i++){ if(i%2===0) out+=(i/2+1)+'. '; out+='<span data-l="ply" data-v="'+(i+1)+'"'+(i+1===cur?' class="cur"':'')+'>'+esc(ls(h[i]))+'</span> '; }
     return out;
   }
+  function plyLabel(n){ if(n<=0) return t('Starting position'); var m=st.list[n-1]; return Math.ceil(n/2)+(n%2?'. ':'… ')+ls(m.san); }
   function navHtml(){
-    var cur=shown(), dis=function(c){ return c?' disabled':''; };
+    var cur=shown(), dis=function(c){ return c?' disabled':''; }, br=st.vi!=null;
+    /* fixed-size row: browsing only changes the middle label and colours, never the layout */
     return '<div class="mnav"><button class="btn ghost sm" data-l="nav" data-v="first" aria-label="'+t('First move')+'"'+dis(cur<=0)+'>⏮</button>'+
       '<button class="btn ghost sm" data-l="nav" data-v="prev" aria-label="'+t('Previous move')+'"'+dis(cur<=0)+'>◀</button>'+
+      '<span class="mpos'+(br?' on':'')+'" title="'+esc(br?t('Looking back. The game waits for you.'):t('Current position'))+'">'+(br?'👀 '+esc(plyLabel(cur)):esc(t('Now')))+'</span>'+
       '<button class="btn ghost sm" data-l="nav" data-v="next" aria-label="'+t('Next move')+'"'+dis(cur>=st.p)+'>▶</button>'+
-      '<button class="btn ghost sm" data-l="nav" data-v="last" aria-label="'+t('Back to the game')+'"'+dis(cur>=st.p)+'>⏭</button></div>';
+      '<button class="btn ghost sm'+(br?' hot':'')+'" data-l="nav" data-v="last" aria-label="'+t('Back to the game')+'"'+dis(cur>=st.p)+'>⏭</button></div>';
   }
   L.view=function(){
     var h='';
@@ -502,7 +505,6 @@ function GuessLesson(slot){
     var gm=games[st.gi], pct=st.guessed?Math.round(st.first/st.guessed*100):null;
     h+='<div class="lbar"><span class="pill">'+esc(short(gm.w))+' – '+esc(short(gm.b))+' '+gm.yr+'</span><span class="pill '+(pct==null?'':pct>=50?'g':'y')+'">'+t('{a}/{b} first try',{a:st.first,b:st.guessed})+'</span><span class="pill">'+t('{n} pts',{n:st.first*2+st.second})+'</span><span class="pill" data-clock="g">'+mmss(L.clock.secs())+' / 30:00</span></div>';
     h+='<div id="gb"></div>';
-    if(st.vi!=null) h+='<div class="msg info">👀 '+t('Looking at move {n}. The game waits for you.',{n:Math.ceil(st.vi/2)+(st.vi%2?'.':'…')})+' <button class="btn sm" data-l="nav" data-v="last">'+t('Back to the game')+' ⏭</button></div>';
     h+='<div class="msg '+st.mcls+'">'+st.msg+'</div>';
     if(st.status==='guess'&&st.crit) h+= st.thinkEnd? '<div class="msg info" data-clock="think">'+t('Thinking time:')+' '+mmss((st.thinkEnd-Date.now())/1000)+'</div>' : '<button class="btn play" data-l="think">🧠 '+t('Start 2:30 thinking timer')+'</button>';
     if(st.status==='reveal') h+='<button class="btn play" data-l="cont">'+t('Continue')+' →</button>';

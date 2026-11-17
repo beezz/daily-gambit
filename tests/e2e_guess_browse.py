@@ -38,7 +38,7 @@ async def main():
             await pg.keyboard.press('ArrowLeft'); await pg.keyboard.press('ArrowLeft'); await pg.keyboard.press('ArrowLeft'); await pg.wait_for_timeout(500)
             check(await pg.evaluate("window.__L().state().vi")==P-3, tag+': ArrowLeft x3 steps back 3 plies')
             check(await pg.evaluate(BOARD)==await pg.evaluate(EXPECT,P-3), tag+': board shows that position')
-            check(await pg.is_visible('text=Back to the game'), tag+': "back to the game" shown while browsing')
+            check(await pg.evaluate("document.querySelector('.mpos').classList.contains('on')"), tag+': position label shows we are looking back')
             await pg.keyboard.press('ArrowRight'); await pg.wait_for_timeout(500)
             check(await pg.evaluate("window.__L().state().vi")==P-2, tag+': ArrowRight steps forward')
             await pg.keyboard.press('ArrowUp'); await pg.wait_for_timeout(500)
@@ -48,6 +48,14 @@ async def main():
             check(await pg.evaluate("document.querySelector('.mlist .cur').dataset.v")=='5', tag+': current move highlighted')
             await pg.click('[data-l="nav"][data-v="next"]'); await pg.wait_for_timeout(500)
             check(await pg.evaluate("window.__L().state().vi")==6, tag+': ▶ button steps forward')
+            # layout must not jump while browsing: every block keeps its position and size
+            RECTS="[...document.querySelectorAll('#lesson .msg, #lesson .mlist, #lesson .mnav, #lesson .btns, #lesson .lbar')].map(e=>{const r=e.getBoundingClientRect();return [Math.round(r.top+scrollY),Math.round(r.height)]})"
+            seen=[]
+            for k in ['ArrowLeft','ArrowLeft','ArrowUp','ArrowRight','End','ArrowLeft']:
+                await pg.keyboard.press(k); await pg.wait_for_timeout(250); seen.append(await pg.evaluate(RECTS))
+            await pg.click('[data-l="nav"][data-v="last"]'); await pg.wait_for_timeout(500); seen.append(await pg.evaluate(RECTS))
+            check(all(x==seen[0] for x in seen), tag+': nothing moves or resizes while browsing %s'%({str(x) for x in seen} if any(x!=seen[0] for x in seen) else ''))
+            await pg.click('[data-l="ply"][data-v="5"]'); await pg.wait_for_timeout(300)
             await pg.click('[data-l="nav"][data-v="last"]'); await pg.wait_for_timeout(500)
             check(await pg.evaluate("window.__L().state().vi")==None and await pg.evaluate(BOARD)==await pg.evaluate(EXPECT,P), tag+': ⏭ returns to the live game')
             await pg.keyboard.press('ArrowRight'); await pg.wait_for_timeout(150)
