@@ -501,13 +501,13 @@ function GuessLesson(slot){
     }
     var gm=games[st.gi], pct=st.guessed?Math.round(st.first/st.guessed*100):null;
     h+='<div class="lbar"><span class="pill">'+esc(short(gm.w))+' – '+esc(short(gm.b))+' '+gm.yr+'</span><span class="pill '+(pct==null?'':pct>=50?'g':'y')+'">'+t('{a}/{b} first try',{a:st.first,b:st.guessed})+'</span><span class="pill">'+t('{n} pts',{n:st.first*2+st.second})+'</span><span class="pill" data-clock="g">'+mmss(L.clock.secs())+' / 30:00</span></div>';
-    h+='<div id="gb"></div>'+navHtml();
+    h+='<div id="gb"></div>';
     if(st.vi!=null) h+='<div class="msg info">👀 '+t('Looking at move {n}. The game waits for you.',{n:Math.ceil(st.vi/2)+(st.vi%2?'.':'…')})+' <button class="btn sm" data-l="nav" data-v="last">'+t('Back to the game')+' ⏭</button></div>';
     h+='<div class="msg '+st.mcls+'">'+st.msg+'</div>';
     if(st.status==='guess'&&st.crit) h+= st.thinkEnd? '<div class="msg info" data-clock="think">'+t('Thinking time:')+' '+mmss((st.thinkEnd-Date.now())/1000)+'</div>' : '<button class="btn play" data-l="think">🧠 '+t('Start 2:30 thinking timer')+'</button>';
     if(st.status==='reveal') h+='<button class="btn play" data-l="cont">'+t('Continue')+' →</button>';
     if(st.finished) h+='<button class="btn go" data-l="log">'+t('Log this session')+' →</button>';
-    h+='<div class="mlist">'+(movesHtml()||'—')+'</div>';
+    h+='<div class="mlist">'+(movesHtml()||'—')+'</div>'+navHtml();
     if(!st.finished) h+='<div class="btns"><button class="btn ghost sm" data-l="stop">'+t('End game here & log')+'</button><button class="btn ghost sm" data-l="menu">'+t('Choose another game')+'</button></div>';
     return h;
   };
