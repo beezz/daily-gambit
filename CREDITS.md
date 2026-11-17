@@ -9,7 +9,7 @@
 | **Lichess "SFX" sound set** (Enigmahack) | `public/sound/` | AGPL-3.0-or-later | https://github.com/lichess-org/lila (`public/sound/sfx`) |
 | **Lichess puzzle database** (selection of ~670 puzzles) | `public/data/puzzles.json` | CC0 | https://database.lichess.org/#puzzles |
 | **Master games** by José Raúl Capablanca and Akiba Rubinstein (game scores, 1900s–1930s) | `public/data/games.json` | historical game records | PGNs via https://github.com/rozim/ChessData (PgnMentor) |
-| **Fonts** Fredoka and Nunito (loaded from Google Fonts) | — | SIL Open Font License 1.1 | https://fonts.google.com |
+| **Fonts** Fredoka and Nunito (self-hosted woff2, latin + latin-ext, from @fontsource 5.3.0) | `public/fonts/` | SIL Open Font License 1.1 (`public/fonts/OFL-*.txt`) | https://fonts.google.com · https://fontsource.org |
 
 The otter mascot, the app code and the endgame position set were made for this project and are released under GPL-3.0-or-later with the rest of the app.
 

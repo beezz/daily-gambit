@@ -1,0 +1,15 @@
+# Cloudflare Pages response headers (not part of the offline cache)
+/sw.js
+  Cache-Control: no-cache
+
+/
+  Cache-Control: no-cache
+
+/index.html
+  Cache-Control: no-cache
+
+/*.wasm
+  Content-Type: application/wasm
+
+/engine/stockfish-17.1-lite-single-03e3232.wasm
+  Content-Type: application/wasm
