@@ -11,7 +11,15 @@ function render(){
   var c=compute(), tb=tab(), root=document.getElementById('root');
   var h='<div class="wrap">';
   if(tb==='lesson'){
-    h+='<div class="lhead"><button class="back" data-act="leave" aria-label="'+t('Back')+'">←</button><h2>'+esc(L.title)+'</h2></div><div id="lesson"></div>';
+    h+='<div class="lhead"><button class="back" data-act="leave" aria-label="'+t('Back')+'">←</button><h2>'+esc(L.title)+'</h2>'+
+       '<span class="aclk" title="'+esc(t('Only exercise time counts'))+'">⏱ <b data-clock="active">'+mmss(L.clock?L.clock.secs():0)+'</b></span>'+
+       '<button class="back hb" data-act="pause" aria-label="'+t('Pause')+'" title="'+t('Pause')+'">⏸</button>'+
+       '<button class="back hb" data-act="end" aria-label="'+t('End & log')+'" title="'+t('End & log')+'">⏹</button></div>'+
+       '<div id="pausebox" class="card pausebox"'+(L.paused?'':' hidden')+'><div class="pz">⏸</div><h3>'+t('Paused')+'</h3>'+
+       '<p class="muted">'+t('The clock is stopped. Only time spent on exercises counts.')+'</p>'+
+       '<div class="row"><button class="btn play big" data-act="unpause">▶ '+t('Resume')+'</button>'+
+       '<button class="btn ghost" data-act="end">⏹ '+t('End & log')+'</button></div></div>'+
+       '<div id="lesson"'+(L.paused?' hidden':'')+'></div>';
   } else {
     var pct=c.next?Math.round((c.xp-c.rank.xp)/(c.next.xp-c.rank.xp)*100):100;
     var owed=REWARDS.filter(function(r){return r.status==='earned'||r.status==='unpicked'}).length;
@@ -359,6 +367,8 @@ document.addEventListener('click',function(e){
   else if(act==='coord'){ openLesson('thu','coord'); }
   else if(act==='resume'){ location.hash='lesson'; }
   else if(act==='leave'){ location.hash='today'; }
+  else if(act==='pause'||act==='unpause'){ if(!L) return; L.paused=act==='pause'; var pb=document.getElementById('pausebox'), ls=document.getElementById('lesson'); if(pb) pb.hidden=!L.paused; if(ls) ls.hidden=L.paused; driveClock(); if(!L.paused) lr(); }
+  else if(act==='end'){ if(!L) return; L.paused=false; var done=L.finish&&L.finish(); if(!done){ if(L.saved&&L.saved()) toast(t('Game saved — continue any time.')); location.hash='today'; } }
   else if(act==='clearpend'){ e.preventDefault(); clearPend(draft.slot); render(); }
   else if(act==='excuse'){ var s=readDraft(); commitSession({id:s.id,date:s.date,slot:s.slot,min:0,parts:[],excused:true,note:s.note}); }
   else if(act==='del'){ if(pendingDel===id){ S.sessions=S.sessions.filter(function(x){return x.id!==id}); pendingDel=null; Store.delSession(id); toast(t('Session deleted')); render(); } else { pendingDel=id; render(); } }
@@ -406,7 +416,8 @@ document.addEventListener('change',function(e){
   var l=e.target.getAttribute&&e.target.getAttribute('data-l'); if(l&&L&&L.change&&inLesson()){ L.change(l,e.target); }
 });
 window.addEventListener('hashchange',function(){ pendingDel=null; pendingCycle=false; pendingGive=null; render(); window.scrollTo(0,0); });
-setInterval(function(){ if(inLesson()&&L.tick) L.tick(); },500);
+setInterval(function(){ driveClock(); if(inLesson()&&L.tick) L.tick(); },500);
+document.addEventListener('visibilitychange',driveClock);
 
 /* ---------- boot ---------- */
 setLang(S.lang);

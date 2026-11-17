@@ -15,22 +15,37 @@ function setPend(slot,o){
 function clearPend(slot){ delete PEND[slot]; lsSet('ctq2_pend',PEND); }
 function setL(x){ L=x; }
 function freeBoards(all){ Object.keys(BOARDS).forEach(function(k){ var b=BOARDS[k]; if(!b.cg) return; if(all){ try{ b.cg.destroy(); }catch(e){} delete BOARDS[k]; } else b.cg.setAutoShapes([]); }); }
-function switchLesson(slot,kind){ freeBoards(true); var x={coord:CoordLesson,wood:WoodLesson}[kind](slot); x.kind=kind; x.t0=Date.now(); L=x; render(); }
+function switchLesson(slot,kind){ freeBoards(true); if(L&&L.clock) L.clock.halt(); var x={coord:CoordLesson,wood:WoodLesson}[kind](slot); L=newLessonObj(x,kind); render(); driveClock(); }
 function inLesson(){ return location.hash==='#lesson' && !!L; }
-function lr(){ var c=document.getElementById('lesson'); if(!c||!L) return; freeBoards(false); c.innerHTML=L.view(); if(L.mount) L.mount(c); }
+function lr(){ var c=document.getElementById('lesson'); if(!c||!L) return; freeBoards(false); c.innerHTML=L.view(); if(L.mount) L.mount(c); driveClock(); }
 function openLesson(slot,kind){
   freeBoards(true);
   var make={wood:WoodLesson,coord:CoordLesson,endgame:EndgameLesson,guess:GuessLesson,friday:FridayLesson,weekend:WeekendLesson}[kind||SL[slot].lesson];
   var root=document.getElementById('root');
   root.innerHTML='<div class="wrap"><div class="card"><span class="spin"></span> '+t('Loading lesson…')+'</div></div>';
-  loadData().then(function(){ L=make(slot); L.kind=kind||SL[slot].lesson; L.t0=Date.now(); if(location.hash==='#lesson') render(); else location.hash='lesson'; })
+  loadData().then(function(){ L=newLessonObj(make(slot),kind||SL[slot].lesson); if(location.hash==='#lesson') render(); else location.hash='lesson'; driveClock(); })
     .catch(function(){ toast(t('Could not load the lesson files. Check your connection.')); location.hash='today'; render(); });
 }
-function finishLesson(slot,o){ freeBoards(true); setPend(slot,o); draft.slot=slot; L=null; location.hash='today'; toast(t('Lesson done! Check the form and tap Complete.')); }
+function finishLesson(slot,o){ freeBoards(true); if(L&&L.clock) L.clock.halt(); setPend(slot,o); draft.slot=slot; L=null; location.hash='today'; toast(t('Lesson done! Check the form and tap Complete.')); }
 function engineError(fen){
   return '<div class="msg no">'+t('Stockfish couldn’t start on this device.')+' '+(fen?'<a href="https://lichess.org/analysis/standard/'+encodeURI(fen.replace(/ /g,'_'))+'" target="_blank" rel="noopener">'+t('Open this position on Lichess')+'</a>':'')+'</div>';
 }
 function elapsedMin(t0){ return Math.max(1,Math.round((Date.now()-t0)/60000)); }
+/* Exercise clock: runs only while the child is actually doing an exercise (see driveClock). */
+function Clock(){ this.ms=0; this.since=0; }
+Clock.prototype.run=function(){ if(!this.since) this.since=Date.now(); };
+Clock.prototype.halt=function(){ if(this.since){ this.ms+=Date.now()-this.since; this.since=0; } };
+Clock.prototype.set=function(on){ if(on) this.run(); else this.halt(); };
+Clock.prototype.secs=function(){ return (this.ms+(this.since?Date.now()-this.since:0))/1000; };
+Clock.prototype.min=function(){ return Math.max(1,Math.round(this.secs()/60)); };
+function driveClock(){
+  if(!L||!L.clock) return;
+  var on=inLesson()&&!L.paused&&!document.hidden&&(!L.active||!!L.active());
+  L.clock.set(on); L.isOn=on;
+  if(L.onClock) L.onClock(on);
+  var e=document.querySelector('[data-clock="active"]'); if(e) e.textContent=mmss(L.clock.secs());
+}
+function newLessonObj(x,kind){ x.kind=kind; x.t0=Date.now(); x.clock=new Clock(); x.paused=false; return x; }
 function sideName(c){ return c==='w'?t('White'):t('Black'); }
 
 /* ===================== WOODPECKER ===================== */
@@ -48,24 +63,24 @@ function WoodLesson(slot){
   if(slot==='mon'){ for(var i=S.wpPos;i<DATA.pz.wood[setName].length;i++) queue.push(i); }
   else { batch=thuBatch(); if(batch){ setName=batch.set; batch.items.forEach(function(x){ queue.push(x[0]); target[x[0]]=x[2]; }); } }
   var set=DATA.pz.wood[setName];
-  var st={phase:'intro',qi:0,ri:0,results:[],failed:[],retried:{},rq:[],cur:null,msg:'',mcls:'',cbShown:false,cb:false,solveMs:0,segStart:0,stopped:false};
-  function solveSecs(){ return (st.solveMs+(st.segStart?Date.now()-st.segStart:0))/1000; }
+  var st={phase:'intro',qi:0,ri:0,results:[],failed:[],retried:{},rq:[],cur:null,msg:'',mcls:'',cbShown:false,cb:false,stopped:false,solve:new Clock()};
+  function solveSecs(){ return st.solve.secs(); }
   function acc(){ var n=st.results.length; return n?Math.round(st.results.filter(function(r){return r.ok}).length/n*100):null; }
   function startPuzzle(idx,retry){
     var p=set[idx], g=new Chess(p[1]), moves=p[2].split(' ');
-    st.cur={idx:idx,g:g,moves:moves,step:0,kid:g.turn()==='w'?'b':'w',status:'wait',last:null,retry:!!retry,t0:0,p:p};
+    st.cur={idx:idx,g:g,moves:moves,step:0,kid:g.turn()==='w'?'b':'w',status:'wait',last:null,retry:!!retry,t0:0,p:p,clock:new Clock()};
     st.msg=retry?t('Retry: picture the whole line first.'):t('Watch the opponent’s move…'); st.mcls='info';
     lr();
     var cur=st.cur;
     setTimeout(function(){ if(st.cur!==cur) return; var m=tryMove(g,moveFromUci(moves[0])); cur.last=m; cur.step=1;
       if(retry){ cur.status='viz'; st.msg=t('Find the full solution in your head. Tap “Ready” when you see it.'); }
-      else { cur.status='play'; cur.t0=Date.now(); st.msg=t('{side} to move — find the best move!',{side:sideName(cur.kid)}); }
+      else { cur.status='play'; cur.t0=Date.now(); driveClock(); st.msg=t('{side} to move — find the best move!',{side:sideName(cur.kid)}); }
       st.mcls='info'; lr(); },650);
   }
   function recorded(idx){ return st.results.some(function(r){return r.idx===idx}); }
   function record(ok){
     var c=st.cur; if(c.retry) return;
-    var secs=(Date.now()-c.t0)/1000;
+    c.clock.halt(); var secs=c.clock.secs();
     st.results.push({idx:c.idx,ok:ok?1:0,secs:secs});
     if(!ok) st.failed.push(c.idx);
     var a=acc();
@@ -111,7 +126,6 @@ function WoodLesson(slot){
     else if(st.phase==='retry'){ st.ri++; if(st.ri>=st.rq.length){ st.phase='done'; st.cur=null; lr(); return; } startPuzzle(st.rq[st.ri],true); }
   }
   function finishSolve(){
-    if(st.segStart){ st.solveMs+=Date.now()-st.segStart; st.segStart=0; }
     st.rq=st.failed.filter(function(i){return !st.retried[i]});
     st.rq.forEach(function(i){ st.retried[i]=true; });
     if(st.rq.length){ st.phase='retry'; st.ri=0; startPuzzle(st.rq[0],true); }
@@ -121,7 +135,7 @@ function WoodLesson(slot){
   function canKeep(){ return !st.stopped && nextIndex()<queue.length; }
   function keepSolving(){
     var q=nextIndex(); if(q>=queue.length){ toast(t('No more puzzles in this set.')); return; }
-    st.qi=q; st.phase='solve'; st.segStart=Date.now(); st.cur=null; startPuzzle(queue[q]);
+    st.qi=q; st.phase='solve'; st.cur=null; startPuzzle(queue[q]);
   }
   L.view=function(){
     var h='';
@@ -169,18 +183,18 @@ function WoodLesson(slot){
     board.marks=st.cur.bad||{}; board.set(st.cur.g,st.cur.last);
   };
   L.tick=function(){
-    var e=$('[data-clock="solve"]'); if(e&&st.segStart) e.textContent=mmss(solveSecs())+' / '+mmss(GOAL);
-    var p=$('[data-clock="puz"]'); if(p&&st.cur&&st.cur.t0) p.textContent=Math.round((Date.now()-st.cur.t0)/1000)+'s';
+    var e=$('[data-clock="solve"]'); if(e) e.textContent=mmss(solveSecs())+' / '+mmss(GOAL);
+    var p=$('[data-clock="puz"]'); if(p&&st.cur) p.textContent=Math.round(st.cur.clock.secs())+'s';
   };
   L.act=function(a){
-    if(a==='start'){ st.phase='solve'; st.segStart=Date.now(); st.qi=0; if(!queue.length){ st.phase='done'; lr(); return; } startPuzzle(queue[0]); }
+    if(a==='start'){ st.phase='solve'; st.qi=0; if(!queue.length){ st.phase='done'; lr(); return; } startPuzzle(queue[0]); }
     else if(a==='next') next();
     else if(a==='replay') replay();
     else if(a==='ready'){ st.cur.status='play'; st.msg=t('Now play it!'); st.mcls='info'; lr(); }
     else if(a==='endsolve') finishSolve();
     else if(a==='skipretry'){ st.phase='done'; st.cur=null; lr(); }
     else if(a==='keep') keepSolving();
-    else if(a==='cbstop'){ st.cb=false; st.stopped=true; if(st.segStart){ st.solveMs+=Date.now()-st.segStart; st.segStart=0; } st.phase='done'; st.cur=null; lr(); }
+    else if(a==='cbstop'){ st.cb=false; st.stopped=true; st.phase='done'; st.cur=null; lr(); }
     else if(a==='cbgo'){ st.cb=false; lr(); if(st.cur&&st.cur.status==='ok') next(); }
     else if(a==='coord'){ if(st.results.length) logIt(true); switchLesson('thu','coord'); }
     else if(a==='log'){ logIt(false); }
@@ -188,12 +202,15 @@ function WoodLesson(slot){
   function logIt(stay){
     var n=st.results.length, ok=st.results.filter(function(r){return r.ok}).length;
     var solveMin=Math.max(1,Math.round(solveSecs()/60));
-    var o={n:n,ok:ok,wmin:solveMin,min:elapsedMin(L.t0),stopped:st.stopped,
+    var o={n:n,ok:ok,wmin:solveMin,min:L.clock.min(),stopped:st.stopped,
       parts:slot==='mon'?[n>=15,st.failed.length>0&&st.failed.every(function(i){return st.retried[i]})&&st.phase==='done'||(st.failed.length===0&&n>0)]:[n>0&&n>=queue.length*0.8],
       extra:{items:st.results.map(function(r){return [r.idx,r.ok,Math.round(r.secs)]}),set:setName}};
     if(stay){ setPend(slot,o); return; }
     finishLesson(slot,o);
   }
+  L.active=function(){ return (st.phase==='solve'||st.phase==='retry')&&!st.cb; };
+  L.onClock=function(on){ st.solve.set(on&&st.phase==='solve'); if(st.cur) st.cur.clock.set(on&&st.cur.status==='play'&&!st.cur.retry); };
+  L.finish=function(){ logIt(false); return true; };
   return L;
 }
 
@@ -208,7 +225,7 @@ function rndSq(){ return FILES[Math.floor(Math.random()*8)]+(1+Math.floor(Math.r
 function CoordLesson(slot){
   var L={slot:slot,title:t('Coordinates Quiz')};
   var LIMIT=8*60;
-  var st={phase:'intro',n:0,ok:0,q:null,ans:null,t0:0,flip:false,ms:0};
+  var st={phase:'intro',n:0,ok:0,q:null,ans:null,flip:false};
   var TYPES=['tap','tap','name','color','color','knight'];
   function newQ(){
     if((st.n%5)===0) st.flip=Math.random()<0.5;
@@ -221,8 +238,8 @@ function CoordLesson(slot){
     st.n++; if(right) st.ok++; st.ans={right:right,shown:shown}; lr();
     setTimeout(function(){ if(st.phase==='quiz'&&st.ans) newQ(); }, st.q.t==='knight'?2200:(right?650:1600));
   }
-  function used(){ return (st.ms+(st.t0?Date.now()-st.t0:0))/1000; }
-  function stop(){ if(st.t0){ st.ms+=Date.now()-st.t0; st.t0=0; } st.phase='done'; st.ans=null; lr(); }
+  function used(){ return L.clock.secs(); }
+  function stop(){ st.phase='done'; st.ans=null; lr(); }
   function isDark(sq){ return (FILES.indexOf(sq[0])+(+sq[1]))%2===1; }
   L.view=function(){
     if(st.phase==='intro') return '<div class="card"><h2>⚡ '+t('Rapid-fire coordinates')+'</h2><p class="sub">'+t('8 minutes of quick questions: tap a square, name a square, light or dark, and knight routes. Speed and accuracy both count!')+'</p><button class="btn play" data-l="start">'+t('Start quiz')+'</button></div>';
@@ -246,17 +263,19 @@ function CoordLesson(slot){
     if(q.t==='knight'){ g.put({type:'n',color:'w'},q.sq); b.marks={}; b.marks[q.to]='target'; if(st.ans){ q.path.forEach(function(s,i){ if(i>0) b.labels[s]=String(i); }); } }
     b.set(g);
   };
-  L.tick=function(){ var e=$('[data-clock="q"]'); if(e&&st.t0){ e.textContent=mmss(used())+' / '+mmss(LIMIT); if(used()>=LIMIT&&st.phase==='quiz'&&!st.ans) stop(); } };
+  L.tick=function(){ var e=$('[data-clock="q"]'); if(e){ e.textContent=mmss(used())+' / '+mmss(LIMIT); if(used()>=LIMIT&&st.phase==='quiz'&&!st.ans) stop(); } };
   L.act=function(a,el){
-    if(a==='start'){ st.phase='quiz'; st.t0=Date.now(); newQ(); }
-    else if(a==='resume'){ st.phase='quiz'; st.t0=Date.now(); newQ(); }
+    if(a==='start'){ st.phase='quiz'; newQ(); }
+    else if(a==='resume'){ st.phase='quiz'; newQ(); }
     else if(a==='pick'&&!st.ans){ var v=el.getAttribute('data-v'), q=st.q;
       if(q.t==='name') answer(v===q.sq,t('It was {sq}',{sq:q.sq}));
       if(q.t==='color') answer(v===(isDark(q.sq)?'dark':'light'), t(isDark(q.sq)?'{sq} is dark':'{sq} is light',{sq:q.sq}));
       if(q.t==='knight') answer(+v===q.k,t('It takes {n} moves: {p}',{n:q.k,p:q.path.join(' → ')})); }
     else if(a==='end') stop();
-    else if(a==='log'){ finishLesson('thu',{parts:[false,st.n>=10],min:Math.max(1,Math.round(used()/60)),addMin:true,extra:{coord:{n:st.n,ok:st.ok}}}); }
+    else if(a==='log'){ finishLesson('thu',{parts:[false,st.n>=10],min:L.clock.min(),addMin:true,extra:{coord:{n:st.n,ok:st.ok}}}); }
   };
+  L.active=function(){ return st.phase==='quiz'; };
+  L.finish=function(){ L.act('log'); return true; };
   return L;
 }
 
@@ -342,7 +361,7 @@ function EndgameLesson(slot){
   L.view=function(){
     var h='';
     if(st.view==='menu'){
-      h+='<div class="lbar"><span class="pill" data-clock="eg">'+mmss((Date.now()-L.t0)/1000)+' / 30:00</span><span class="pill">'+t('Stockfish level {n}',{n:S.skill})+'</span><span class="pill">'+t('{a}/{b} solved',{a:st.attempts.filter(function(a){return a.ok}).length,b:st.attempts.length})+'</span></div>';
+      h+='<div class="lbar"><span class="pill" data-clock="eg">'+mmss(L.clock.secs())+' / 30:00</span><span class="pill">'+t('Stockfish level {n}',{n:S.skill})+'</span><span class="pill">'+t('{a}/{b} solved',{a:st.attempts.filter(function(a){return a.ok}).length,b:st.attempts.length})+'</span></div>';
       if(st.engine==='fail') h+=engineError();
       else if(st.engine!=='ok') h+='<div class="msg info"><span class="spin"></span> '+t('Waking up Stockfish…')+'</div>';
       var grp='';
@@ -357,7 +376,7 @@ function EndgameLesson(slot){
       return h;
     }
     var c=st.cur;
-    h+='<div class="lbar"><span class="pill">'+t(c.eg.name)+'</span><span class="pill '+(c.eg.goal==='win'?'g':'y')+'">'+(c.eg.goal==='win'?t('Win'):t('Draw'))+'</span><span class="pill">'+t('Move {n}',{n:c.kidMoves})+'</span><span class="pill" data-clock="eg">'+mmss((Date.now()-L.t0)/1000)+'</span></div>';
+    h+='<div class="lbar"><span class="pill">'+t(c.eg.name)+'</span><span class="pill '+(c.eg.goal==='win'?'g':'y')+'">'+(c.eg.goal==='win'?t('Win'):t('Draw'))+'</span><span class="pill">'+t('Move {n}',{n:c.kidMoves})+'</span><span class="pill" data-clock="eg">'+mmss(L.clock.secs())+'</span></div>';
     if(st.engine==='fail') h+=engineError(c.g.fen());
     h+='<div id="egb"></div><div class="msg '+c.mcls+'">'+(c.status==='think'?'<span class="spin"></span> '+t('Stockfish is thinking…'):c.status==='check'?'<span class="spin"></span> '+t('Stockfish is checking your move…'):c.msg)+'</div>';
     if(c.status==='lost'&&c.canRetry) h+='<button class="btn play" data-l="takeback">↶ '+t('Take back and try again')+'</button>';
@@ -368,7 +387,7 @@ function EndgameLesson(slot){
     return h;
   };
   L.mount=function(c){ var e=$('#egb',c); if(!e||!st.cur) return; var b=boardFor(e,{flip:st.cur.kid==='b',movable:st.cur.status==='play'?st.cur.kid:null,onMove:onMove}); b.marks=st.cur.marks||{}; b.set(st.cur.g,st.cur.last); };
-  L.tick=function(){ var e=$('[data-clock="eg"]'); if(e) e.textContent=mmss((Date.now()-L.t0)/1000)+(st.view==='menu'?' / 30:00':''); };
+  L.tick=function(){ var e=$('[data-clock="eg"]'); if(e) e.textContent=mmss(L.clock.secs())+(st.view==='menu'?' / 30:00':''); };
   L.act=function(a,el){
     if(a==='pick'){ var id=el.getAttribute('data-v'); start(ENDGAMES.filter(function(e){return e.id===id})[0]); }
     else if(a==='retry') start(st.cur.eg);
@@ -379,11 +398,13 @@ function EndgameLesson(slot){
       var ok=st.attempts.filter(function(x){return x.ok}).length, n=st.attempts.length;
       var eg={}; st.attempts.forEach(function(x){ if(x.ok&&!x.hint) eg[x.id]=true; });
       var pawn=st.attempts.some(function(x){return ['ks','op1','op2','op3','tri'].indexOf(x.id)>=0}), rook=st.attempts.some(function(x){return ['luc1','luc2','phi','van'].indexOf(x.id)>=0});
-      finishLesson('tue',{acc:n?Math.round(ok/n*100):null,min:elapsedMin(L.t0),parts:[pawn,rook],extra:{eg:eg}});
+      finishLesson('tue',{acc:n?Math.round(ok/n*100):null,min:L.clock.min(),parts:[pawn,rook],extra:{eg:eg}});
     }
   };
   L.change=function(a,el){ if(a==='skill'){ S.skill=+el.value; Store.saveSettings(); lr(); } };
   L.state=function(){ return st; };
+  L.active=function(){ return st.view==='play'&&st.cur&&st.cur.status!=='won'&&st.cur.status!=='lost'; };
+  L.finish=function(){ L.act('log'); return true; };
   return L;
 }
 
@@ -450,7 +471,7 @@ function GuessLesson(slot){
       return h+'</div></div>';
     }
     var gm=games[st.gi], pct=st.guessed?Math.round(st.first/st.guessed*100):null;
-    h+='<div class="lbar"><span class="pill">'+esc(short(gm.w))+' – '+esc(short(gm.b))+' '+gm.yr+'</span><span class="pill '+(pct==null?'':pct>=50?'g':'y')+'">'+t('{a}/{b} first try',{a:st.first,b:st.guessed})+'</span><span class="pill">'+t('{n} pts',{n:st.first*2+st.second})+'</span><span class="pill" data-clock="g">'+mmss((Date.now()-L.t0)/1000)+' / 30:00</span></div>';
+    h+='<div class="lbar"><span class="pill">'+esc(short(gm.w))+' – '+esc(short(gm.b))+' '+gm.yr+'</span><span class="pill '+(pct==null?'':pct>=50?'g':'y')+'">'+t('{a}/{b} first try',{a:st.first,b:st.guessed})+'</span><span class="pill">'+t('{n} pts',{n:st.first*2+st.second})+'</span><span class="pill" data-clock="g">'+mmss(L.clock.secs())+' / 30:00</span></div>';
     h+='<div id="gb"></div><div class="msg '+st.mcls+'">'+st.msg+'</div>';
     if(st.status==='guess'&&st.crit) h+= st.thinkEnd? '<div class="msg info" data-clock="think">'+t('Thinking time:')+' '+mmss((st.thinkEnd-Date.now())/1000)+'</div>' : '<button class="btn play" data-l="think">🧠 '+t('Start 2:30 thinking timer')+'</button>';
     if(st.status==='reveal') h+='<button class="btn play" data-l="cont">'+t('Continue')+' →</button>';
@@ -459,15 +480,19 @@ function GuessLesson(slot){
     if(!st.finished) h+='<div class="btns"><button class="btn ghost sm" data-l="stop">'+t('End game here & log')+'</button><button class="btn ghost sm" data-l="menu">'+t('Choose another game')+'</button></div>';
     return h;
   };
+  var pausedAt=0;
+  L.active=function(){ return st.view==='play'&&!st.finished; };
+  L.onClock=function(on){ if(!on&&!pausedAt) pausedAt=Date.now(); if(on&&pausedAt){ if(st.thinkEnd) st.thinkEnd+=Date.now()-pausedAt; pausedAt=0; } };
+  L.finish=function(){ if(st.gi==null) return false; L.act('stop'); return true; };
   L.mount=function(c){ var e=$('#gb',c); if(!e) return; var b=boardFor(e,{flip:games[st.gi].side==='b',movable:st.status==='guess'?games[st.gi].side:null,onMove:onMove}); b.marks=st.marks; b.set(st.g,st.last); };
-  L.tick=function(){ var e=$('[data-clock="g"]'); if(e) e.textContent=mmss((Date.now()-L.t0)/1000)+' / 30:00'; var th=$('[data-clock="think"]'); if(th&&st.thinkEnd){ var left=(st.thinkEnd-Date.now())/1000; th.textContent=left>0?t('Thinking time:')+' '+mmss(left):'⏰ '+t('Time! Make your guess.'); } };
+  L.tick=function(){ var e=$('[data-clock="g"]'); if(e) e.textContent=mmss(L.clock.secs())+' / 30:00'; var th=$('[data-clock="think"]'); if(th&&st.thinkEnd){ var left=(st.thinkEnd-Date.now())/1000; th.textContent=left>0?t('Thinking time:')+' '+mmss(left):'⏰ '+t('Time! Make your guess.'); } };
   L.act=function(a,el){
     if(a==='go') start(+el.getAttribute('data-v'));
     else if(a==='think'){ st.thinkEnd=Date.now()+150000; st.critUsed++; lr(); }
     else if(a==='cont'){ st.status='auto'; st.marks={}; step(); }
     else if(a==='menu'){ st.view='menu'; st.gi=null; lr(); }
     else if(a==='stop'||a==='log'){
-      finishLesson('wed',{acc:st.guessed?Math.round(st.first/st.guessed*100):null,min:elapsedMin(L.t0),parts:[st.finished,st.critUsed>=2],extra:{game:st.gi},note:short(games[st.gi].w)+' – '+short(games[st.gi].b)+' '+games[st.gi].yr+' · '+t('{n} pts',{n:st.first*2+st.second})});
+      finishLesson('wed',{acc:st.guessed?Math.round(st.first/st.guessed*100):null,min:L.clock.min(),parts:[st.finished,st.critUsed>=2],extra:{game:st.gi},note:short(games[st.gi].w)+' – '+short(games[st.gi].b)+' '+games[st.gi].yr+' · '+t('{n} pts',{n:st.first*2+st.second})});
     }
   };
   return L;
@@ -477,9 +502,9 @@ function GuessLesson(slot){
 function FridayLesson(slot){
   var L={slot:slot,title:t('Blindfold & Threats')};
   var B=DATA.pz.blind, T=DATA.pz.threat;
-  var st={tab:'blind',bPos:S.blindPos||0,tPos:S.threatPos||0,bN:0,bOk:0,tN:0,tOk:0,bT0:0,tT0:0,b:null,t:null};
+  var st={tab:'blind',bPos:S.blindPos||0,tPos:S.threatPos||0,bN:0,bOk:0,tN:0,tOk:0,bc:new Clock(),tc:new Clock(),b:null,t:null};
   Speech.init();
-  function newBlind(){ var p=B[st.bPos%B.length]; st.b={p:p,si:0,line:[],peek:false,status:'play',opts:null,msg:''}; prepOpts(); if(!st.bT0) st.bT0=Date.now(); }
+  function newBlind(){ var p=B[st.bPos%B.length]; st.b={p:p,si:0,line:[],peek:false,status:'play',opts:null,msg:''}; prepOpts(); }
   function prepOpts(){ var b=st.b, s=b.p.steps[b.si]; b.opts=s?shuffle([s.san].concat(s.alt)):null; }
   function meColor(p){ return p.side==='White'?'w':'b'; }
   function blindText(p){ var me=meColor(p);
@@ -487,7 +512,6 @@ function FridayLesson(slot){
   function newThreat(){
     var p=T[st.tPos%T.length], g=new Chess(p.fen), mv=tryMove(g,moveFromUci(p.pre));
     st.t={p:p,g:g,last:mv,kid:mv.color,status:'play',marks:{},msg:t('You just played {m}. Now it’s your opponent’s turn — what is their strongest move? Move their piece!',{m:'<b>'+ls(p.last)+'</b>'}),mcls:'info'};
-    if(!st.tT0) st.tT0=Date.now();
   }
   function bAnswer(san){
     var b=st.b, s=b.p.steps[b.si];
@@ -513,7 +537,7 @@ function FridayLesson(slot){
     if(st.tab==='blind'){
       if(!st.b) return h+'<div class="card"><h2>🙈 '+t('Blindfold tactics')+'</h2><p class="sub">'+t('No board! Listen to (or read) where the pieces are, picture the board in your head, then pick the winning moves. 15 minutes.')+'</p><button class="btn play" data-l="bstart">'+t('Start')+'</button></div>';
       var b=st.b, p=b.p, me=meColor(p);
-      h+='<div class="lbar"><span class="pill">#'+(st.bPos%B.length+1)+'</span><span class="pill" data-clock="bt">'+mmss((Date.now()-st.bT0)/1000)+' / 15:00</span></div>';
+      h+='<div class="lbar"><span class="pill">#'+(st.bPos%B.length+1)+'</span><span class="pill" data-clock="bt">'+mmss(st.bc.secs())+' / 15:00</span></div>';
       h+='<div class="btext"><b>'+t('{side} to move',{side:sideName(me)})+'</b><br>⬜ '+t('White')+': '+describeSide(p.fen,'w')+'<br>⬛ '+t('Black')+': '+describeSide(p.fen,'b')+'<br><span class="sub">'+t('{side} just played {m}',{side:sideName(me==='w'?'b':'w'),m:ls(p.last)})+'</span>'+(b.line.length?'<br>'+t('Line so far:')+' <b>'+ls(b.line.join(' '))+'</b>':'')+'</div>';
       h+='<div class="btns">'+(Speech.available()?'<button class="btn ghost sm" data-l="say">🔊 '+t('Read aloud')+'</button>':'')+'<button class="btn ghost sm" data-l="peek">👁 '+(b.peek?t('Hide board'):t('Peek at board'))+'</button></div>';
       if(b.peek) h+='<div id="bb" style="margin-top:10px"></div>';
@@ -523,7 +547,7 @@ function FridayLesson(slot){
     } else {
       if(!st.t) return h+'<div class="card"><h2>⚠️ '+t('Threat drills')+'</h2><p class="sub">'+t('You just made a move. Before you relax: what is your opponent’s strongest reply? Move their piece to show it. 15 minutes.')+'</p><button class="btn play" data-l="tstart">'+t('Start')+'</button></div>';
       var tt=st.t;
-      h+='<div class="lbar"><span class="pill">#'+(st.tPos%T.length+1)+'</span><span class="pill" data-clock="tt">'+mmss((Date.now()-st.tT0)/1000)+' / 15:00</span></div>';
+      h+='<div class="lbar"><span class="pill">#'+(st.tPos%T.length+1)+'</span><span class="pill" data-clock="tt">'+mmss(st.tc.secs())+' / 15:00</span></div>';
       h+='<div id="tb"></div><div class="msg '+tt.mcls+'">'+tt.msg+'</div>';
       if(tt.status!=='play') h+='<button class="btn play" data-l="tnext">'+t('Next')+' →</button>';
     }
@@ -534,7 +558,10 @@ function FridayLesson(slot){
     var bb=$('#bb',c); if(bb&&st.b){ var g=new Chess(st.b.p.fen); var bd=boardFor(bb,{flip:st.b.p.side==='Black'}); bd.set(g); }
     var tb=$('#tb',c); if(tb&&st.t){ var tt=st.t, opp=tt.kid==='w'?'b':'w'; var b2=boardFor(tb,{flip:tt.kid==='b',movable:tt.status==='play'?opp:null,onMove:tMove}); b2.marks=tt.marks; b2.set(tt.g,tt.last); }
   };
-  L.tick=function(){ var a=$('[data-clock="bt"]'); if(a&&st.bT0) a.textContent=mmss((Date.now()-st.bT0)/1000)+' / 15:00'; var b=$('[data-clock="tt"]'); if(b&&st.tT0) b.textContent=mmss((Date.now()-st.tT0)/1000)+' / 15:00'; };
+  L.tick=function(){ var a=$('[data-clock="bt"]'); if(a) a.textContent=mmss(st.bc.secs())+' / 15:00'; var b=$('[data-clock="tt"]'); if(b) b.textContent=mmss(st.tc.secs())+' / 15:00'; };
+  L.active=function(){ return (st.tab==='blind'&&!!st.b)||(st.tab==='threat'&&!!st.t); };
+  L.onClock=function(on){ st.bc.set(on&&st.tab==='blind'); st.tc.set(on&&st.tab==='threat'); };
+  L.finish=function(){ if(!(st.bN+st.tN)) return false; L.act('log'); return true; };
   L.act=function(a,el){
     if(a==='tab'){ st.tab=el.getAttribute('data-v'); lr(); }
     else if(a==='bstart'){ newBlind(); lr(); Speech.say(blindText(st.b.p)); }
@@ -546,7 +573,7 @@ function FridayLesson(slot){
     else if(a==='log'){
       if(st.b&&st.b.status!=='play') st.bPos++; if(st.t&&st.t.status!=='play') st.tPos++;
       var n=st.bN+st.tN, ok=st.bOk+st.tOk;
-      finishLesson('fri',{acc:n?Math.round(ok/n*100):null,min:elapsedMin(L.t0),parts:[st.bN>0,st.tN>0],extra:{blindPos:st.bPos,threatPos:st.tPos},note:t('Blindfold')+' '+st.bOk+'/'+st.bN+' · '+t('Threats')+' '+st.tOk+'/'+st.tN});
+      finishLesson('fri',{acc:n?Math.round(ok/n*100):null,min:L.clock.min(),parts:[st.bN>0,st.tN>0],extra:{blindPos:st.bPos,threatPos:st.tPos},note:t('Blindfold')+' '+st.bOk+'/'+st.bN+' · '+t('Threats')+' '+st.tOk+'/'+st.tN});
     }
   };
   return L;
@@ -558,7 +585,7 @@ var EVALS=[['+-','White winning'],['±','White better'],['=','Equal'],['∓','Bl
 function WeekendLesson(slot){
   var L={slot:slot,title:t('Classical Game & Notebook')};
   var saved=lsGet('ctq2_wk');
-  var st={view:'menu',cfg:{color:'w',tc:'15+10',level:4,soh:true},G:null,b:null};
+  var st={view:'menu',cfg:{color:'w',tc:'15+10',level:4,soh:true},G:null,b:null,nbc:new Clock()};
   function persist(){ if(st.G) lsSet('ctq2_wk',st.G); }
   function gameFrom(G){ var g=new Chess(); G.moves.forEach(function(s){ tryMove(g,s); }); return g; }
   function startPlay(){
@@ -662,7 +689,7 @@ function WeekendLesson(slot){
       var pg=new Chess(); for(var i=0;i<G.ply;i++) tryMove(pg,G.moves[i]);
       st.nbGame=pg; st.nbLast=G.ply?hist[G.ply-1]:null;
       var note=G.notes[G.ply]||{};
-      h+='<div class="lbar"><span class="pill">'+G.result+'</span><span data-nbcount class="pill '+(nd>=3?'g':'y')+'">📓 '+t('{n}/3 key moments',{n:nd})+'</span><span class="pill" data-clock="nb">'+mmss((Date.now()-(G.nbStart||Date.now()))/1000)+' / 45:00</span></div>';
+      h+='<div class="lbar"><span class="pill">'+G.result+'</span><span data-nbcount class="pill '+(nd>=3?'g':'y')+'">📓 '+t('{n}/3 key moments',{n:nd})+'</span><span class="pill" data-clock="nb">'+mmss(st.nbc.secs())+' / 45:00</span></div>';
       h+='<div id="nbb"></div>';
       h+='<div class="btns"><button class="btn ghost sm" data-l="nav" data-v="0">⏮</button><button class="btn ghost sm" data-l="nav" data-v="-1">◀</button><button class="btn ghost sm" data-l="nav" data-v="1">▶</button><button class="btn ghost sm" data-l="nav" data-v="999">⏭</button></div>';
       h+='<div class="mlist">'+G.moves.map(function(s,i){ var n=G.notes[i+1]; return (i%2===0?'<b>'+(i/2+1)+'.</b> ':'')+'<span data-l="goto" data-v="'+(i+1)+'" class="'+(G.ply===i+1?'cur ':'')+(n&&n.tag?'tag ':'')+(n&&noteDone(n)?'nt':'')+'">'+esc(ls(s))+(n&&n.tag?n.tag:'')+'</span>'; }).join(' ')+'</div>';
@@ -705,14 +732,14 @@ function WeekendLesson(slot){
   };
   L.tick=function(){
     var G=st.G; if(!G) return;
-    if(st.view==='play'&&!G.result){
+    if(st.view==='play'&&!G.result&&L.isOn){
       var g=curGame(), tn=g.turn(), now=Date.now(); G.clock[tn]-=now-(st.lastTs||now); st.lastTs=now;
       if(G.clock[tn]<=0){ G.clock[tn]=0; endGame(tn==='w'?'0-1':'1-0','time'); return; }
       if(tn===G.kid&&G.clock[tn]<30000&&!G.lowWarned){ G.lowWarned=true; Sound.play('LowTime'); }
       ['w','b'].forEach(function(cl){ var e=$('[data-clock="'+cl+'"]'); if(e){ e.lastChild.textContent=mmss(G.clock[cl]/1000); e.classList.toggle('low',G.clock[cl]<60000); } });
       if(now%5000<1000) persist();
     }
-    var nbc=$('[data-clock="nb"]'); if(nbc&&G.nbStart) nbc.textContent=mmss((Date.now()-G.nbStart)/1000)+' / 45:00';
+    var nbc=$('[data-clock="nb"]'); if(nbc) nbc.textContent=mmss(st.nbc.secs())+' / 45:00';
   };
   L.act=function(a,el){
     var G=st.G, v=el&&el.getAttribute('data-v');
@@ -741,11 +768,15 @@ function WeekendLesson(slot){
       var nb={date:G.date,source:G.source,kid:G.kid,tc:G.tc,result:res,moves:G.moves,notes:G.notes,level:G.level||null,review:G.review&&G.review.done?{evals:G.review.evals,mistakes:mistakes()}:null};
       Store.saveNotebook(G.id,nb);
       G.finished=true; lsSet('ctq2_wk',null);
-      finishLesson('wk',{min:elapsedMin(L.t0),tc:G.tc==='Other'?'Other':G.tc,res:kidRes,bl:tags,engine:G.unlocked&&nd>=3,
+      finishLesson('wk',{min:L.clock.min(),tc:G.tc==='Other'?'Other':G.tc,res:kidRes,bl:tags,engine:G.unlocked&&nd>=3,
         parts:[G.moves.length>=20,G.source==='app'&&G.soh,nd>=3],extra:{nb:G.id},note:(G.source==='app'?'Stockfish L'+G.level:t('Entered game'))+' · '+res+' · '+t('{n} notebook moments',{n:nd})});
     }
   };
   L.change=function(a,el){ if(a==='level'){ st.cfg.level=+el.value; lr(); } else if(a==='soh'){ st.cfg.soh=el.checked; } };
+  L.active=function(){ return st.view!=='menu'&&!!st.G; };
+  L.onClock=function(on){ st.nbc.set(on&&(st.view==='nb'||st.view==='review')); if(!on) st.lastTs=0; else if(!st.lastTs) st.lastTs=Date.now(); };
+  L.finish=function(){ if(!st.G||!st.G.result) return false; L.act('log'); return true; };
+  L.saved=function(){ return !!(st.G&&!st.G.result); };
   return L;
 }
 window.__L=function(){return L};
