@@ -33,7 +33,10 @@ var DICT={
 /* navigation & general */
 'Today':['Dnes','Heute'],'Week':['Týždeň','Woche'],'Puzzles':['Úlohy','Aufgaben'],'Prizes':['Odmeny','Preise'],'Log':['Záznam','Protokoll'],
 'Mon':['Po','Mo'],'Tue':['Ut','Di'],'Wed':['St','Mi'],'Thu':['Št','Do'],'Fri':['Pi','Fr'],'Wknd':['Víkend','WE'],
-'Back':['Späť','Zurück'],'Cancel':['Zrušiť','Abbrechen'],'Close':['Zavrieť','Schließen'],'Continue':['Pokračovať','Weiter'],'Confirm':['Potvrdiť','Bestätigen'],
+'Back':['Späť','Zurück'],'Pause':['Pauza','Pause'],'Resume':['Pokračovať','Weiter'],'Paused':['Pauza','Pausiert'],'End & log':['Ukončiť a zapísať','Beenden & eintragen'],
+'Only exercise time counts':['Počíta sa len čas pri cvičení','Nur die Übungszeit zählt'],
+'The clock is stopped. Only time spent on exercises counts.':['Hodiny stoja. Počíta sa len čas strávený cvičením.','Die Uhr ist angehalten. Nur die Zeit beim Üben zählt.'],
+'Game saved — continue any time.':['Partia je uložená — pokračuj kedykoľvek.','Partie gespeichert — jederzeit weiterspielen.'],'Cancel':['Zrušiť','Abbrechen'],'Close':['Zavrieť','Schließen'],'Continue':['Pokračovať','Weiter'],'Confirm':['Potvrdiť','Bestätigen'],
 'Delete':['Zmazať','Löschen'],'Remove':['Odstrániť','Entfernen'],'Add':['Pridať','Hinzufügen'],'Clear':['Vymazať','Leeren'],'Next':['Ďalej','Weiter'],'Start':['Štart','Start'],
 'Loading…':['Načítavam…','Lädt…'],'Loading lesson…':['Načítavam lekciu…','Lektion wird geladen…'],'Loading notebook…':['Načítavam zápisník…','Notizbuch wird geladen…'],
 'optional':['nepovinné','optional'],'Tip':['Tip','Tipp'],'Hint':['Nápoveda','Hinweis'],'Restart':['Odznova','Neu starten'],'Undo':['Späť','Rückgängig'],
