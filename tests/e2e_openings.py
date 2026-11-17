@@ -59,7 +59,7 @@ async def main():
         await pg.click('[data-act="slot"][data-k="mon"]'); await pg.click('[data-act="lesson"]'); await pg.wait_for_timeout(700)
         await pg.click('[data-l="start"]'); await pg.wait_for_timeout(500)
         await pg.click('nav a[href="#openings"]'); await pg.wait_for_timeout(800)
-        check(len(await pg.query_selector_all('.oprep'))==3, 'three repertoires listed')
+        check(len(await pg.query_selector_all('[data-act="opexplore"]'))==3, 'three repertoires listed')
         check(await pg.is_disabled('.oprep [data-act="opdrill"]'), 'drill disabled before any line is learned')
         # learn the first Italian line
         await pg.click('[data-act="oplearn"][data-id="italian"]'); await pg.wait_for_timeout(500)
