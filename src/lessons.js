@@ -427,14 +427,14 @@ function EndgameLesson(slot){
 function GuessLesson(slot){
   var L={slot:slot,title:t('Guess-the-Move')};
   var games=DATA.games;
-  var st={view:'menu',gi:null,g:null,list:null,p:0,status:'',tries:0,first:0,second:0,guessed:0,crit:false,critUsed:0,thinkEnd:0,last:null,marks:{},msg:'',mcls:'info',openPlies:16,finished:false};
+  var st={view:'menu',gi:null,g:null,list:null,p:0,status:'',tries:0,first:0,second:0,guessed:0,crit:false,critUsed:0,thinkEnd:0,last:null,marks:{},msg:'',mcls:'info',openPlies:16,finished:false,vi:null};
   function nextIdx(){ for(var i=0;i<games.length;i++) if((S.gamesDone||[]).indexOf(i)<0) return i; return 0; }
   function heroName(gm){ return gm.side==='w'?gm.w:gm.b; }
   function short(n){ return n.split(',')[0]; }
   function start(gi){
     var gm=games[gi], tmp=new Chess(), list=[];
     gm.san.split(' ').forEach(function(s){ var m=tryMove(tmp,s); if(m) list.push(m); });
-    st.gi=gi; st.g=new Chess(); st.list=list; st.p=0; st.view='play'; st.first=st.second=st.guessed=0; st.critUsed=0; st.finished=false; st.last=null; st.marks={};
+    st.gi=gi; st.g=new Chess(); st.list=list; st.p=0; st.vi=null; st.view='play'; st.first=st.second=st.guessed=0; st.critUsed=0; st.finished=false; st.last=null; st.marks={};
     st.msg=t('Playing the opening…'); st.mcls='info'; lr(); step();
   }
   function isCritical(m,hero){
@@ -471,10 +471,24 @@ function GuessLesson(slot){
       lr();
     }
   }
-  function movesText(){
-    var out=[], h=st.g.history();
-    for(var i=0;i<h.length;i++){ if(i%2===0) out.push((i/2+1)+'.'); out.push(h[i]); }
-    return ls(out.join(' '));
+  /* Browsing the moves already played (like the arrows on Lichess). st.vi = plies shown; null = live position. */
+  function shown(){ return st.vi==null?st.p:st.vi; }
+  function browse(n){
+    if(st.view!=='play') return;
+    n=Math.max(0,Math.min(st.p,n));
+    st.vi=n>=st.p?null:n; lr();
+  }
+  function movesHtml(){
+    var h=st.g.history(), out='', cur=shown();
+    for(var i=0;i<h.length;i++){ if(i%2===0) out+=(i/2+1)+'. '; out+='<span data-l="ply" data-v="'+(i+1)+'"'+(i+1===cur?' class="cur"':'')+'>'+esc(ls(h[i]))+'</span> '; }
+    return out;
+  }
+  function navHtml(){
+    var cur=shown(), dis=function(c){ return c?' disabled':''; };
+    return '<div class="mnav"><button class="btn ghost sm" data-l="nav" data-v="first" aria-label="'+t('First move')+'"'+dis(cur<=0)+'>⏮</button>'+
+      '<button class="btn ghost sm" data-l="nav" data-v="prev" aria-label="'+t('Previous move')+'"'+dis(cur<=0)+'>◀</button>'+
+      '<button class="btn ghost sm" data-l="nav" data-v="next" aria-label="'+t('Next move')+'"'+dis(cur>=st.p)+'>▶</button>'+
+      '<button class="btn ghost sm" data-l="nav" data-v="last" aria-label="'+t('Back to the game')+'"'+dis(cur>=st.p)+'>⏭</button></div>';
   }
   L.view=function(){
     var h='';
@@ -487,11 +501,13 @@ function GuessLesson(slot){
     }
     var gm=games[st.gi], pct=st.guessed?Math.round(st.first/st.guessed*100):null;
     h+='<div class="lbar"><span class="pill">'+esc(short(gm.w))+' – '+esc(short(gm.b))+' '+gm.yr+'</span><span class="pill '+(pct==null?'':pct>=50?'g':'y')+'">'+t('{a}/{b} first try',{a:st.first,b:st.guessed})+'</span><span class="pill">'+t('{n} pts',{n:st.first*2+st.second})+'</span><span class="pill" data-clock="g">'+mmss(L.clock.secs())+' / 30:00</span></div>';
-    h+='<div id="gb"></div><div class="msg '+st.mcls+'">'+st.msg+'</div>';
+    h+='<div id="gb"></div>';
+    if(st.vi!=null) h+='<div class="msg info">👀 '+t('Looking at move {n}. The game waits for you.',{n:Math.ceil(st.vi/2)+(st.vi%2?'.':'…')})+' <button class="btn sm" data-l="nav" data-v="last">'+t('Back to the game')+' ⏭</button></div>';
+    h+='<div class="msg '+st.mcls+'">'+st.msg+'</div>';
     if(st.status==='guess'&&st.crit) h+= st.thinkEnd? '<div class="msg info" data-clock="think">'+t('Thinking time:')+' '+mmss((st.thinkEnd-Date.now())/1000)+'</div>' : '<button class="btn play" data-l="think">🧠 '+t('Start 2:30 thinking timer')+'</button>';
     if(st.status==='reveal') h+='<button class="btn play" data-l="cont">'+t('Continue')+' →</button>';
     if(st.finished) h+='<button class="btn go" data-l="log">'+t('Log this session')+' →</button>';
-    h+='<div class="mlist">'+esc(movesText()||'—')+'</div>';
+    h+='<div class="mlist">'+(movesHtml()||'—')+'</div>'+navHtml();
     if(!st.finished) h+='<div class="btns"><button class="btn ghost sm" data-l="stop">'+t('End game here & log')+'</button><button class="btn ghost sm" data-l="menu">'+t('Choose another game')+'</button></div>';
     return h;
   };
@@ -499,13 +515,34 @@ function GuessLesson(slot){
   L.active=function(){ return st.view==='play'&&!st.finished; };
   L.onClock=function(on){ if(!on&&!pausedAt) pausedAt=Date.now(); if(on&&pausedAt){ if(st.thinkEnd) st.thinkEnd+=Date.now()-pausedAt; pausedAt=0; } };
   L.finish=function(){ if(st.gi==null) return false; L.act('stop'); return true; };
-  L.mount=function(c){ var e=$('#gb',c); if(!e) return; var b=boardFor(e,{flip:games[st.gi].side==='b',movable:st.status==='guess'?games[st.gi].side:null,onMove:onMove}); b.marks=st.marks; b.set(st.g,st.last); };
+  L.mount=function(c){
+    var e=$('#gb',c); if(!e) return;
+    if(st.vi!=null){
+      var g=new Chess(), last=null; for(var i=0;i<st.vi;i++){ var m=st.list[i]; last=tryMove(g,{from:m.from,to:m.to,promotion:m.promotion}); }
+      var bv=boardFor(e,{flip:games[st.gi].side==='b',movable:null}); bv.marks={}; bv.set(g,last);
+      var cu=$('.mlist .cur',c); if(cu) cu.scrollIntoView({block:'nearest'});
+      return;
+    }
+    var b=boardFor(e,{flip:games[st.gi].side==='b',movable:st.status==='guess'?games[st.gi].side:null,onMove:onMove}); b.marks=st.marks; b.set(st.g,st.last);
+    var ml=$('.mlist',c); if(ml) ml.scrollTop=ml.scrollHeight;
+  };
+  L.state=function(){ return st; };
+  L.key=function(k){
+    if(st.view!=='play') return false;
+    var cur=shown();
+    if(k==='ArrowLeft') browse(cur-1); else if(k==='ArrowRight') browse(cur+1);
+    else if(k==='ArrowUp'||k==='Home') browse(0); else if(k==='ArrowDown'||k==='End') browse(st.p);
+    else return false;
+    return true;
+  };
   L.tick=function(){ var e=$('[data-clock="g"]'); if(e) e.textContent=mmss(L.clock.secs())+' / 30:00'; var th=$('[data-clock="think"]'); if(th&&st.thinkEnd){ var left=(st.thinkEnd-Date.now())/1000; th.textContent=left>0?t('Thinking time:')+' '+mmss(left):'⏰ '+t('Time! Make your guess.'); } };
   L.act=function(a,el){
     if(a==='go') start(+el.getAttribute('data-v'));
     else if(a==='think'){ st.thinkEnd=Date.now()+150000; st.critUsed++; lr(); }
     else if(a==='cont'){ st.status='auto'; st.marks={}; step(); }
-    else if(a==='menu'){ st.view='menu'; st.gi=null; lr(); }
+    else if(a==='menu'){ st.view='menu'; st.gi=null; st.vi=null; lr(); }
+    else if(a==='ply') browse(+el.getAttribute('data-v'));
+    else if(a==='nav'){ var v=el.getAttribute('data-v'), cur=shown(); browse(v==='first'?0:v==='prev'?cur-1:v==='next'?cur+1:st.p); }
     else if(a==='stop'||a==='log'){
       finishLesson('wed',{acc:st.guessed?Math.round(st.first/st.guessed*100):null,min:L.clock.min(),parts:[st.finished,st.critUsed>=2],extra:{game:st.gi},note:short(games[st.gi].w)+' – '+short(games[st.gi].b)+' '+games[st.gi].yr+' · '+t('{n} pts',{n:st.first*2+st.second})});
     }
