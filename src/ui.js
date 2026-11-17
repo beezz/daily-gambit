@@ -313,15 +313,44 @@ function confetti(){
 }
 
 /* ---------- logging ---------- */
-function commitSession(s){
+/* Build a session straight from what an in-app lesson recorded (no form). */
+function sessionFromPend(slot){
+  var P=PEND[slot]; if(!P) return null; var sl=SL[slot];
+  var s={id:uid(),date:today(),slot:slot,min:P.min||1,parts:sl.parts.map(function(_,i){return !!(P.parts&&P.parts[i])}),note:P.note||'',lesson:true,stopped:!!P.stopped};
+  if(sl.kind==='wp'&&P.n>0){ s.wp={n:P.n,ok:Math.min(P.ok||0,P.n),min:P.wmin||0,cycle:S.wpCycle}; if(P.extra&&P.extra.items){ s.wp.items=P.extra.items; s.wp.set=P.extra.set; } }
+  if(sl.kind==='acc'&&P.acc!=null) s.acc=P.acc;
+  if(sl.kind==='game'){ s.tc=P.tc||'15+10'; s.res=P.res||''; s.blunders=P.bl||0; s.engine=!!P.engine; if(P.extra&&P.extra.nb) s.nb=P.extra.nb; }
+  return s;
+}
+/* "Finish & log" in a lesson: log immediately. A second in-app lesson for the same slot today
+   (e.g. Thursday puzzles, later the coordinates quiz) is merged into the earlier entry. */
+function autoLog(slot){
+  if(Store.mode==='readonly'){ toast(t('Lesson done! Check the form and tap Complete.')); render(); return; }
+  var s=sessionFromPend(slot); if(!s) return;
+  var prev=S.sessions.filter(function(x){ return x.lesson&&!x.excused&&x.slot===slot&&x.date===s.date; }).pop();
+  var opt={};
+  if(prev){
+    opt.prev=prev; opt.wpAdv=s.wp?(s.wp.items?s.wp.items.length:s.wp.n):0;
+    var m=Object.assign({},prev,{min:(prev.min||0)+s.min,parts:s.parts.map(function(v,i){return !!(v||(prev.parts||[])[i])}),stopped:!!(prev.stopped||s.stopped)});
+    if(s.wp&&prev.wp){ m.wp=Object.assign({},prev.wp,{n:prev.wp.n+s.wp.n,ok:prev.wp.ok+s.wp.ok,min:(prev.wp.min||0)+(s.wp.min||0)}); if(prev.wp.items||s.wp.items) m.wp.items=(prev.wp.items||[]).concat(s.wp.items||[]); }
+    else if(s.wp) m.wp=s.wp;
+    ['acc','tc','res','blunders','engine','nb'].forEach(function(k){ if(s[k]!=null&&s[k]!=='') m[k]=s[k]; });
+    if(s.note) m.note=prev.note?prev.note+' · '+s.note:s.note;
+    s=m;
+  }
+  commitSession(s,opt);
+}
+function commitSession(s,opt){
   if(Store.mode==='readonly') return;
-  var before=compute(), P=PEND[s.slot], settingsChanged=false, full=fullyDone(s);
-  if(full) s.reward=true;
+  opt=opt||{};
+  var prev=opt.prev, before=compute(), P=PEND[s.slot], settingsChanged=false, full=fullyDone(s)&&!(prev&&prev.reward);
+  if(prev) S.sessions=S.sessions.filter(function(x){ return x!==prev; });
+  if(fullyDone(s)) s.reward=true;
   S.sessions.push(s);
-  var msg=s.excused?t('Rest day logged ☾ — streak safe'):'+'+sessionXP(s)+' XP!';
+  var msg=s.excused?t('Rest day logged ☾ — streak safe'):'+'+(sessionXP(s)-(prev?sessionXP(prev):0))+' XP!';
   if(!s.excused){
     if(s.slot==='mon' && s.wp){
-      var adv=s.wp.items?s.wp.items.length:s.wp.n; S.wpPos+=adv; settingsChanged=true;
+      var adv=opt.wpAdv!=null?opt.wpAdv:(s.wp.items?s.wp.items.length:s.wp.n); S.wpPos+=adv; settingsChanged=true;
       if(S.wpPos>=S.setSize){ S.wpCycle++; S.wpPos=0; msg+=' 🐦 '+t('Round complete!'); }
     }
     if(P&&P.extra){
@@ -415,7 +444,7 @@ document.addEventListener('change',function(e){
   if(e.target.closest('#logform')) updateLive();
   var l=e.target.getAttribute&&e.target.getAttribute('data-l'); if(l&&L&&L.change&&inLesson()){ L.change(l,e.target); }
 });
-window.addEventListener('hashchange',function(){ pendingDel=null; pendingCycle=false; pendingGive=null; render(); window.scrollTo(0,0); });
+window.addEventListener('hashchange',function(){ driveClock(); pendingDel=null; pendingCycle=false; pendingGive=null; render(); window.scrollTo(0,0); });
 setInterval(function(){ driveClock(); if(inLesson()&&L.tick) L.tick(); },500);
 document.addEventListener('visibilitychange',driveClock);
 

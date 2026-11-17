@@ -26,7 +26,7 @@ function openLesson(slot,kind){
   loadData().then(function(){ L=newLessonObj(make(slot),kind||SL[slot].lesson); if(location.hash==='#lesson') render(); else location.hash='lesson'; driveClock(); })
     .catch(function(){ toast(t('Could not load the lesson files. Check your connection.')); location.hash='today'; render(); });
 }
-function finishLesson(slot,o){ freeBoards(true); if(L&&L.clock) L.clock.halt(); setPend(slot,o); draft.slot=slot; L=null; location.hash='today'; toast(t('Lesson done! Check the form and tap Complete.')); }
+function finishLesson(slot,o){ freeBoards(true); if(L&&L.clock) L.clock.halt(); setPend(slot,o); draft.slot=slot; L=null; location.hash='today'; autoLog(slot); }
 function engineError(fen){
   return '<div class="msg no">'+t('Stockfish couldn’t start on this device.')+' '+(fen?'<a href="https://lichess.org/analysis/standard/'+encodeURI(fen.replace(/ /g,'_'))+'" target="_blank" rel="noopener">'+t('Open this position on Lichess')+'</a>':'')+'</div>';
 }
