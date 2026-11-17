@@ -12,7 +12,7 @@
 import hashlib, json, os, shutil
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SRC, PUB, DIST = (os.path.join(ROOT, d) for d in ('src', 'public', 'dist'))
-ORDER = ['i18n.js', 'core.js', 'lessons.js', 'ui.js']
+ORDER = ['i18n.js', 'core.js', 'lessons.js', 'openings.js', 'ui.js']
 
 if os.path.isdir(DIST):
     shutil.rmtree(DIST)
