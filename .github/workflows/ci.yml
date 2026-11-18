@@ -38,3 +38,6 @@ jobs:
           (python3 tests/cf_like_server.py 8765 >/dev/null 2>&1 &)
           sleep 2
           python3 tests/smoke.py
+
+      - name: Guess-the-move stays in sync (regression)
+        run: python3 tests/e2e_guess_sync.py

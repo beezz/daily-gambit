@@ -427,7 +427,7 @@ function EndgameLesson(slot){
 function GuessLesson(slot){
   var L={slot:slot,title:t('Guess-the-Move')};
   var games=DATA.games;
-  var st={view:'menu',gi:null,g:null,list:null,p:0,status:'',tries:0,first:0,second:0,guessed:0,crit:false,critUsed:0,thinkEnd:0,last:null,marks:{},msg:'',mcls:'info',openPlies:16,finished:false,vi:null};
+  var st={view:'menu',gi:null,g:null,list:null,p:0,status:'',tries:0,first:0,second:0,guessed:0,crit:false,critUsed:0,thinkEnd:0,last:null,marks:{},msg:'',mcls:'info',openPlies:16,finished:false,vi:null,tok:0};
   function nextIdx(){ for(var i=0;i<games.length;i++) if((S.gamesDone||[]).indexOf(i)<0) return i; return 0; }
   function heroName(gm){ return gm.side==='w'?gm.w:gm.b; }
   function short(n){ return n.split(',')[0]; }
@@ -442,13 +442,24 @@ function GuessLesson(slot){
     if(m.piece==='p'&&'cdef'.indexOf(m.to[0])>=0){ var r=+m.to[1]; if((hero==='w'&&r>=4)||(hero==='b'&&r<=5)) return true; }
     return false;
   }
+  /* The board (st.g) must always be exactly the first st.p moves of the game. Every timer carries a
+     token so a double tap on Continue (or a stray second call) can't play the same move twice and
+     push the board out of step with the move counter. */
+  function sync(){
+    if(st.g.history().length===st.p) return;
+    var g=new Chess(), last=null; for(var i=0;i<st.p;i++){ var x=st.list[i]; last=tryMove(g,{from:x.from,to:x.to,promotion:x.promotion}); }
+    st.g=g; st.last=last;
+  }
+  function apply(m){ var r=tryMove(st.g,{from:m.from,to:m.to,promotion:m.promotion}); st.p++; if(r) st.last=r; else sync(); }
+  function later(fn,ms){ var tok=++st.tok; setTimeout(function(){ if(tok===st.tok) fn(); },ms); }
   function step(){
     if(st.view!=='play') return;
+    sync();
     if(st.p>=st.list.length){ st.finished=true; st.status='done'; st.msg='🏁 '+t('Game over — {r}. Great study!',{r:games[st.gi].res}); st.mcls='ok'; lr(); return; }
     var m=st.list[st.p], hero=games[st.gi].side, mine=m.color===hero&&st.p>=st.openPlies;
     if(!mine){
-      st.status='auto'; var gi=st.gi;
-      setTimeout(function(){ if(st.gi!==gi||st.view!=='play') return; st.last=tryMove(st.g,{from:m.from,to:m.to,promotion:m.promotion}); st.p++; lr(); step(); }, st.p<st.openPlies?120:800);
+      st.status='auto'; var gi=st.gi, p0=st.p;
+      later(function(){ if(st.gi!==gi||st.view!=='play'||st.p!==p0||st.status!=='auto') return; apply(m); lr(); step(); }, st.p<st.openPlies?120:800);
       return;
     }
     st.status='guess'; st.tries=0; st.crit=isCritical(m,hero); st.marks={};
@@ -460,12 +471,12 @@ function GuessLesson(slot){
     var m=st.list[st.p];
     if(mv.from===m.from&&mv.to===m.to&&(!m.promotion||mv.promotion===m.promotion)){
       st.guessed++; if(st.tries===0) st.first++; else st.second++;
-      st.last=tryMove(st.g,{from:m.from,to:m.to,promotion:m.promotion}); st.p++;
+      apply(m);
       st.msg=(st.tries===0?'✓ '+t('Master move! +2'):'✓ '+t('Got it on the second try. +1'))+' ('+ls(m.san)+')'; st.mcls='ok'; st.status='auto'; st.thinkEnd=0; lr();
-      setTimeout(step,700);
+      later(step,700);
     } else {
       st.tries++; st.marks={}; st.marks[mv.from]='bad'; st.marks[mv.to]='bad';
-      if(st.tries>=2){ st.guessed++; st.last=tryMove(st.g,{from:m.from,to:m.to,promotion:m.promotion}); st.p++; st.marks={}; st.marks[m.from]='good'; st.marks[m.to]='good';
+      if(st.tries>=2){ st.guessed++; apply(m); st.marks={}; st.marks[m.from]='good'; st.marks[m.to]='good';
         st.msg=t('The master played {m}. Can you see why?',{m:'<b>'+ls(m.san)+'</b>'}); st.mcls='no'; st.status='reveal'; st.thinkEnd=0; }
       else { st.msg='✗ '+t('Not the master’s move — one more try!'); st.mcls='no'; }
       lr();
@@ -525,6 +536,7 @@ function GuessLesson(slot){
       var cu=$('.mlist .cur',c); if(cu) cu.scrollIntoView({block:'nearest'});
       return;
     }
+    sync();
     var b=boardFor(e,{flip:games[st.gi].side==='b',movable:st.status==='guess'?games[st.gi].side:null,onMove:onMove}); b.marks=st.marks; b.set(st.g,st.last);
     var ml=$('.mlist',c); if(ml) ml.scrollTop=ml.scrollHeight;
   };
@@ -541,7 +553,7 @@ function GuessLesson(slot){
   L.act=function(a,el){
     if(a==='go') start(+el.getAttribute('data-v'));
     else if(a==='think'){ st.thinkEnd=Date.now()+150000; st.critUsed++; lr(); }
-    else if(a==='cont'){ st.status='auto'; st.marks={}; step(); }
+    else if(a==='cont'){ if(st.status!=='reveal') return; st.status='auto'; st.marks={}; step(); }
     else if(a==='menu'){ st.view='menu'; st.gi=null; st.vi=null; lr(); }
     else if(a==='ply') browse(+el.getAttribute('data-v'));
     else if(a==='nav'){ var v=el.getAttribute('data-v'), cur=shown(); browse(v==='first'?0:v==='prev'?cur-1:v==='next'?cur+1:st.p); }
