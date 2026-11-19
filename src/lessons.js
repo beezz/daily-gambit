@@ -257,7 +257,7 @@ function CoordLesson(slot){
   function stop(){ st.phase='done'; st.ans=null; lr(); }
   function isDark(sq){ return (FILES.indexOf(sq[0])+(+sq[1]))%2===1; }
   L.view=function(){
-    if(st.phase==='intro') return '<div class="card"><h2>⚡ '+t('Rapid-fire coordinates')+'</h2><p class="sub">'+t('8 minutes of quick questions: tap a square, name a square, light or dark, and knight routes. Speed and accuracy both count!')+'</p><button class="btn play" data-l="start">'+t('Start quiz')+'</button></div>';
+    if(st.phase==='intro') return '<div class="card"><h2>⚡ '+t('Rapid-fire coordinates')+'</h2><p class="sub">'+t('8 minutes of quick questions: tap a square, name a square, light or dark, and knight routes. Speed and accuracy both count!')+'</p><p class="sub">♔ '+t('The kings stand on their starting squares e1 and e8 — they show you which side you are looking from.')+'</p><button class="btn play" data-l="start">'+t('Start quiz')+'</button></div>';
     if(st.phase==='done') return '<div class="card"><h2>🎉 '+t('Quiz done!')+'</h2><div class="stats"><div class="stat"><b>'+st.ok+'/'+st.n+'</b><span>'+t('correct')+'</span></div><div class="stat"><b>'+(st.n?Math.round(st.ok/st.n*100):0)+'%</b><span>'+t('accuracy')+'</span></div><div class="stat"><b>'+mmss(used())+'</b><span>'+t('time')+'</span></div></div><button class="btn go" data-l="log">'+t('Log Thursday session')+' →</button>'+(used()<LIMIT?'<button class="btn ghost" style="width:100%;margin-top:8px" data-l="resume">↩ '+t('Keep going')+'</button>':'')+'</div>';
     var q=st.q, h='<div class="lbar"><span class="pill">'+st.ok+'/'+st.n+'</span><span class="pill" data-clock="q">'+mmss(used())+' / '+mmss(LIMIT)+'</span><span class="pill">'+(st.flip?t('Black’s view'):t('White’s view'))+'</span></div>';
     var prompt={tap:t('Tap')+' <b>'+q.sq+'</b>',name:t('Which square is highlighted?'),color:t('Is {sq} light or dark?',{sq:'<b>'+q.sq+'</b>'}),knight:t('Knight from {a} to {b}: fewest moves?',{a:'<b>'+q.sq+'</b>',b:'<b>'+q.to+'</b>'})}[q.t];
@@ -273,6 +273,8 @@ function CoordLesson(slot){
     var e=$('#cb8',c); if(!e) return; var q=st.q;
     var b=boardFor(e,{flip:st.flip,coords:q.t==='knight',onTap:q.t==='tap'&&!st.ans?function(sq){ answer(sq===q.sq, sq===q.sq?'':t('That was {a}. {b} is here.',{a:sq,b:q.sq})); }:function(){}});
     var g=new Chess('8/8/8/8/8/8/8/8 w - - 0 1',{skipValidation:true});
+    /* kings on their starting squares (e1, e8) show at a glance whether we look from White's or Black's side */
+    if(q.t==='tap'||q.t==='name'){ g.put({type:'k',color:'w'},'e1'); g.put({type:'k',color:'b'},'e8'); }
     if(q.t==='name'){ b.marks={}; b.marks[q.sq]=st.ans?(st.ans.right?'good':'target'):'target'; }
     if(q.t==='tap'&&st.ans){ b.marks={}; b.marks[q.sq]='good'; }
     if(q.t==='knight'){ g.put({type:'n',color:'w'},q.sq); b.marks={}; b.marks[q.to]='target'; if(st.ans){ q.path.forEach(function(s,i){ if(i>0) b.labels[s]=String(i); }); } }

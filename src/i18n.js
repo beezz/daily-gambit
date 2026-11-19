@@ -33,7 +33,7 @@ var DICT={
 /* navigation & general */
 'Today':['Dnes','Heute'],'Week':['Týždeň','Woche'],'Puzzles':['Úlohy','Aufgaben'],'Prizes':['Odmeny','Preise'],'Log':['Záznam','Protokoll'],
 'Mon':['Po','Mo'],'Tue':['Ut','Di'],'Wed':['St','Mi'],'Thu':['Št','Do'],'Fri':['Pi','Fr'],'Wknd':['Víkend','WE'],
-'Back':['Späť','Zurück'],'Traps':['Pasce','Fallen'],'Drill traps':['Precvičiť pasce','Fallen üben'],'Spring it':['Nastraž','Stellen'],'Avoid it':['Vyhni sa','Vermeiden'],
+'Back':['Späť','Zurück'],'The kings stand on their starting squares e1 and e8 — they show you which side you are looking from.':['Králi stoja na svojich začiatočných poliach e1 a e8 — ukážu ti, z ktorej strany sa pozeráš.','Die Könige stehen auf ihren Startfeldern e1 und e8 — so siehst du, von welcher Seite du schaust.'],'Traps':['Pasce','Fallen'],'Drill traps':['Precvičiť pasce','Fallen üben'],'Spring it':['Nastraž','Stellen'],'Avoid it':['Vyhni sa','Vermeiden'],
 'Learn each trap from both sides: spring it, and don’t fall for it.':['Nauč sa každú pascu z oboch strán: nastraž ju a sám do nej nespadni.','Lerne jede Falle von beiden Seiten: stelle sie, und tapp selbst nicht hinein.'],
 '{a} of {b} learned':['{a} z {b} naučených','{a} von {b} gelernt'],
 'Trap sprung!':['Pasca sklapla!','Falle zugeschnappt!'],'Trap avoided!':['Pasci si sa vyhol!','Falle vermieden!'],
