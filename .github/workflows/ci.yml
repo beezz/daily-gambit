@@ -41,3 +41,9 @@ jobs:
 
       - name: Guess-the-move stays in sync (regression)
         run: python3 tests/e2e_guess_sync.py
+
+      - name: Offline use behind a login wall (Cloudflare Access-like)
+        run: |
+          (python3 tests/access_like_server.py 8767 dist >/dev/null 2>&1 &)
+          sleep 2
+          python3 tests/e2e_offline.py

@@ -235,9 +235,38 @@ function vHistory(c){
     h+='<div class="card"><h2>💾 '+t('Backup')+'</h2><p class="sub">'+(Store.mode==='device'?t('Progress is saved on this device. Keep a backup file in case the phone is lost or the app is removed.'):t('Save a copy of all progress, or move it to another device or to the offline app.'))+'</p>'+
       '<p class="note">'+t('Last backup:')+' <b>'+(lb==null?t('never'):lb===0?t('today'):t('{n} days ago',{n:lb}))+'</b></p>'+
       '<div class="btns"><button class="btn" data-act="export">'+(canDownload()?'⬇️ '+t('Download backup'):'📋 '+t('Copy backup'))+'</button><button class="btn ghost" data-act="import">♻️ '+t('Restore from backup…')+'</button></div></div>';
+    h+='<div class="card" id="offcard"><h2>📴 '+t('Offline')+'</h2><p class="sub"><span class="spin"></span> '+t('Checking…')+'</p></div>';
+    setTimeout(fillOffline,0);
     h+='<div class="card danger"><h2>🗑 '+t('Delete all data')+'</h2><p class="sub">'+t('Removes all sessions, puzzle progress, prizes, badges progress and game notebooks. This cannot be undone.')+'</p><button class="btn warn" data-act="reset1">'+t('Delete all data…')+'</button></div>';
   }
   return h;
+}
+
+/* ---------- offline readiness (Log tab) ---------- */
+function fillOffline(){
+  var el=document.getElementById('offcard'); if(!el) return;
+  var put=function(body){ var e=document.getElementById('offcard'); if(e) e.innerHTML='<h2>📴 '+t('Offline')+'</h2>'+body; };
+  if(Store.mode==='live'||Store.mode==='local'){ put('<p class="sub">'+t('Inside Claude the app needs a connection. For offline use, install the app from its website (Daily Gambit on your own address).')+'</p>'); return; }
+  if(!window.dgOffline){ put('<p class="sub">'+t('This browser can’t keep the app for offline use.')+'</p>'); return; }
+  window.dgOffline.info().then(function(i){
+    var h='';
+    if(!i.supported) h='<p class="sub">'+t('This browser can’t keep the app for offline use.')+'</p>';
+    else if(!i.controlled||!i.cache) h='<p class="msg no">⏳ '+t('Not ready for offline use yet. Keep the app open with internet for a minute, then close and reopen it.')+'</p>';
+    else if(i.cache.missing.length) h='<p class="msg no">⚠️ '+t('{n} of {m} files are missing — the app may not open without internet.',{n:i.cache.missing.length,m:i.cache.total})+'</p><button class="btn" data-act="offfill">⬇️ '+t('Download missing files')+'</button>';
+    else h='<p class="msg ok">✅ '+t('Ready for offline use: all {n} files are saved on this device.',{n:i.cache.total})+'</p>';
+    if(i.updateFailed) h+='<p class="note">'+t('A new version could not be downloaded — the website login has probably expired. Open the app with internet and log in again. Until then this version keeps working offline.')+'</p>';
+    if(i.cache) h+='<p class="note">'+t('Version')+' '+esc(i.cache.version)+(i.online?'':' · '+t('offline now'))+'</p>';
+    put(h);
+  });
+}
+function offFill(btn){
+  if(!window.dgOffline) return; if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span> '+t('Downloading…'); }
+  window.dgOffline.refill().then(function(r){
+    if(r&&r.errors&&r.errors.some(function(e){return e.indexOf('login')===0;})) toast(t('The website login has expired. Open the app with internet, log in, and try again.'));
+    else if(r&&r.missing&&!r.missing.length) toast('✅ '+t('Ready for offline use'));
+    else toast(t('Some files could not be downloaded. Check the internet connection.'));
+    fillOffline();
+  });
 }
 
 /* ---------- players page ---------- */
@@ -434,6 +463,7 @@ document.addEventListener('click',function(e){
   else if(act==='resume'){ location.hash='lesson'; }
   else if(act==='leave'){ location.hash=(L&&L.home)||'today'; }
   else if(act==='uswitch'){ Store.switchUser(id); }
+  else if(act==='offfill'){ offFill(tg); }
   else if(act==='oplearn'||act==='opdrill'||act==='opexplore'){ var li=tg.getAttribute('data-i'); openOpening(act==='oplearn'?'learn':act==='opdrill'?'drill':'explore',id,li==null?null:+li); }
   else if(act==='lidel'){ lsSet('dg_lichess_token',null); LI.cache={}; toast(t('Token removed from this device')); render(); }
   else if(act==='litest'){ LI.cache={}; liStats('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1').then(function(d){ toast(d.err?liErr(d.err):'✓ '+t('Lichess works! {n} master games in the database.',{n:((d.white||0)+(d.draws||0)+(d.black||0)).toLocaleString(LOCALES[LANG])})); }); }

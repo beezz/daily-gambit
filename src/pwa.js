@@ -76,28 +76,62 @@
     });
     window.addEventListener('appinstalled', function () { deferredPrompt = null; render(); });
 
+    // Offline readiness, for the "Offline" card in the Log tab (window.dgOffline).
+    var off = { supported: false, registered: false, updateFailed: false };
+    function ask(type) {
+      return new Promise(function (resolve) {
+        var c = navigator.serviceWorker && navigator.serviceWorker.controller;
+        if (!c) return resolve(null);
+        var ch = new MessageChannel(), done = false;
+        ch.port1.onmessage = function (e) { done = true; resolve(e.data); };
+        setTimeout(function () { if (!done) resolve(null); }, type === 'REFILL' ? 120000 : 5000);
+        c.postMessage({ type: type }, [ch.port2]);
+      });
+    }
+    window.dgOffline = {
+      info: function () {
+        var c = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
+        return ask('STATUS').then(function (st) {
+          return { supported: off.supported, registered: off.registered, controlled: c, updateFailed: off.updateFailed,
+                   online: navigator.onLine, cache: st };
+        });
+      },
+      refill: function () { return ask('REFILL'); }
+    };
+
     if (!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return;
+    off.supported = true;
     var sw = navigator.serviceWorker;
 
     sw.addEventListener('controllerchange', function () {
       if (wantReload) { wantReload = false; location.reload(); }
     });
 
+    // Checking for a new version failed while online: with Cloudflare Access this means the
+    // login expired (sw.js is redirected to the login page). The cached version keeps working.
+    function failed() { if (navigator.onLine !== false && sw.controller) off.updateFailed = true; }
     function track(reg) {
       function offer(w) { if (w && sw.controller) { waiting = w; render(); } }
       offer(reg.waiting);
       reg.addEventListener('updatefound', function () {
         var nw = reg.installing;
         if (!nw) return;
-        nw.addEventListener('statechange', function () { if (nw.state === 'installed') offer(reg.waiting || nw); });
+        off.updateFailed = false;
+        nw.addEventListener('statechange', function () {
+          if (nw.state === 'installed') offer(reg.waiting || nw);
+          // a new version that could not download all its files (e.g. the Cloudflare Access login expired)
+          if (nw.state === 'redundant' && !reg.waiting && reg.active !== nw) off.updateFailed = true;
+        });
       });
+      // look for a new version now (register() alone doesn't tell us if that check failed)
+      if (sw.controller) { try { reg.update().then(function () { off.updateFailed = false; }, failed); } catch (e) {} }
       document.addEventListener('visibilitychange', function () {
-        if (document.visibilityState === 'visible') { try { reg.update().catch(function () {}); } catch (e) {} }
+        if (document.visibilityState === 'visible') { try { reg.update().then(function () { off.updateFailed = false; }, failed); } catch (e) {} }
       });
     }
 
     function register() {
-      try { sw.register('sw.js').then(track).catch(function () {}); } catch (e) {}
+      try { sw.register('sw.js').then(function (reg) { off.registered = true; track(reg); }).catch(function () { off.registered = !!sw.controller; failed(); }); } catch (e) {}
     }
     if (document.readyState === 'complete') register();
     else window.addEventListener('load', register);
