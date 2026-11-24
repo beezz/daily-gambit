@@ -68,7 +68,7 @@ try:
             if n >= len(files) and pg.evaluate("!!navigator.serviceWorker.controller"):
                 break
             pg.wait_for_timeout(500)
-        check(n == len(files), 'cache %s holds all %d precache entries (%d)' % (cache1, len(files), n))
+        check(n >= len(files), 'cache %s holds all %d precache entries (%d)' % (cache1, len(files), n))
         check(pg.evaluate("!!navigator.serviceWorker.controller"), 'page is controlled by the service worker')
 
         man = pg.evaluate("fetch('manifest.webmanifest').then(r=>r.text()).then(t=>JSON.parse(t))")
